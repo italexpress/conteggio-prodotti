@@ -7,6 +7,9 @@ import {
   InlineStack,
   Box,
   EmptyState,
+  Select,
+  ButtonGroup,
+  Button,
 } from "@shopify/polaris";
 import { useState, useMemo } from "react";
 import type { AggregatedProduct } from "../services/orders.server";
@@ -21,26 +24,92 @@ export function ProductsNeededTable({
   orderCount,
 }: ProductsNeededTableProps) {
   const [searchValue, setSearchValue] = useState("");
+  const [viewMode, setViewMode] = useState<"variants" | "grouped">("variants");
+  const [sortValue, setSortValue] = useState("qty_desc");
 
-  const filteredProducts = useMemo(() => {
+  // 1. Applica filtro di ricerca
+  const searchFilteredProducts = useMemo(() => {
     if (!searchValue.trim()) return products;
     const search = searchValue.toLowerCase();
     return products.filter((p) =>
-      p.displayName.toLowerCase().includes(search)
+      p.displayName.toLowerCase().includes(search) || 
+      p.productTitle.toLowerCase().includes(search)
     );
   }, [products, searchValue]);
 
-  const totalItems = filteredProducts.reduce(
+  // 2. Applica raggruppamento (Visuale Generale)
+  const processedProducts = useMemo(() => {
+    if (viewMode === "variants") {
+      return [...searchFilteredProducts];
+    }
+
+    // Raggruppa per Prodotto (ignora taglia/variante)
+    // Se i colori sono prodotti separati ("Valencia Caffe"), questo raggruppa ignorando le taglie.
+    // Se il colore è la prima opzione della variante (es. "Caffè / XL"), proviamo a estrarre il colore.
+    const groupMap = new Map<string, AggregatedProduct>();
+
+    searchFilteredProducts.forEach((p) => {
+      let groupKey = p.productId;
+      let groupName = p.productTitle;
+
+      // Gestione intelligente varianti: se la variante ha un "/", probabile sia "Colore / Taglia"
+      if (p.variantTitle && p.variantTitle.includes("/")) {
+        const color = p.variantTitle.split("/")[0].trim();
+        groupKey = `${p.productId}-${color}`;
+        groupName = `${p.productTitle} ${color}`;
+      } else if (p.variantTitle && !p.productTitle.toLowerCase().includes(p.variantTitle.toLowerCase())) {
+         // Se non c'è "/", assumiamo che variantTitle sia la taglia e la ignoriamo,
+         // raggruppando tutto sotto productTitle (es. "Valencia Caffe")
+         groupKey = p.productId;
+         groupName = p.productTitle;
+      }
+
+      const existing = groupMap.get(groupKey);
+      if (existing) {
+        existing.totalQuantity += p.totalQuantity;
+        existing.codQuantity += p.codQuantity;
+        existing.codAcceptedQuantity += p.codAcceptedQuantity;
+      } else {
+        groupMap.set(groupKey, {
+          ...p,
+          variantId: groupKey, // mock ID
+          displayName: groupName,
+        });
+      }
+    });
+
+    return Array.from(groupMap.values());
+  }, [searchFilteredProducts, viewMode]);
+
+  // 3. Applica Ordinamento
+  const sortedProducts = useMemo(() => {
+    return processedProducts.sort((a, b) => {
+      switch (sortValue) {
+        case "qty_desc":
+          return b.totalQuantity - a.totalQuantity;
+        case "qty_asc":
+          return a.totalQuantity - b.totalQuantity;
+        case "name_asc":
+          return a.displayName.localeCompare(b.displayName);
+        case "name_desc":
+          return b.displayName.localeCompare(a.displayName);
+        default:
+          return 0;
+      }
+    });
+  }, [processedProducts, sortValue]);
+
+  const totalItems = sortedProducts.reduce(
     (sum, p) => sum + p.totalQuantity,
     0
   );
 
-  const totalCod = filteredProducts.reduce(
+  const totalCod = sortedProducts.reduce(
     (sum, p) => sum + p.codQuantity,
     0
   );
 
-  const rowMarkup = filteredProducts.map((product, index) => (
+  const rowMarkup = sortedProducts.map((product, index) => (
     <IndexTable.Row
       id={product.variantId}
       key={product.variantId}
@@ -96,6 +165,13 @@ export function ProductsNeededTable({
     );
   }
 
+  const sortOptions = [
+    { label: "Quantità (più alti prima)", value: "qty_desc" },
+    { label: "Quantità (più bassi prima)", value: "qty_asc" },
+    { label: "Nome (A-Z)", value: "name_asc" },
+    { label: "Nome (Z-A)", value: "name_desc" },
+  ];
+
   return (
     <BlockStack gap="400">
       <InlineStack align="space-between" blockAlign="center">
@@ -103,12 +179,37 @@ export function ProductsNeededTable({
           Lista prodotti da preparare
         </Text>
         <InlineStack gap="200">
-          <Badge>{filteredProducts.length} prodotti</Badge>
+          <Badge>{sortedProducts.length} righe</Badge>
           <Badge tone="attention">{totalItems} pz totali</Badge>
           {totalCod > 0 && (
             <Badge tone="warning">{totalCod} in contrassegno</Badge>
           )}
         </InlineStack>
+      </InlineStack>
+
+      <InlineStack align="space-between" blockAlign="center">
+        <ButtonGroup segmented>
+          <Button
+            pressed={viewMode === "variants"}
+            onClick={() => setViewMode("variants")}
+          >
+            Dettagliato (con taglie)
+          </Button>
+          <Button
+            pressed={viewMode === "grouped"}
+            onClick={() => setViewMode("grouped")}
+          >
+            Generale (senza taglie)
+          </Button>
+        </ButtonGroup>
+
+        <Select
+          label="Ordina per"
+          labelInline
+          options={sortOptions}
+          value={sortValue}
+          onChange={setSortValue}
+        />
       </InlineStack>
 
       <TextField
@@ -122,9 +223,9 @@ export function ProductsNeededTable({
         autoComplete="off"
       />
 
-      {filteredProducts.length > 0 ? (
+      {sortedProducts.length > 0 ? (
         <IndexTable
-          itemCount={filteredProducts.length}
+          itemCount={sortedProducts.length}
           headings={[
             { title: "Prodotto" },
             { title: "Quantità" },
