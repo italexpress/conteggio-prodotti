@@ -12,6 +12,24 @@ export interface AggregatedProduct {
   codAcceptedQuantity: number; // Contrassegni con tag "ACCETTATO"
 }
 
+// Tipo per un ordine COD non confermato
+export interface UnconfirmedCodOrder {
+  id: string;
+  name: string;           // es. "#1234"
+  createdAt: string;
+  totalPrice: string;
+  currencyCode: string;
+  customerName: string;
+  customerEmail: string;
+  shippingCity: string;
+  shippingProvince: string;
+  itemCount: number;
+  items: Array<{
+    title: string;
+    quantity: number;
+  }>;
+}
+
 // Tipo per la risposta della query GraphQL
 interface OrdersQueryResponse {
   data: {
@@ -21,8 +39,24 @@ interface OrdersQueryResponse {
           id: string;
           name: string;
           tags: string[];
+          createdAt: string;
           displayFinancialStatus: string;
           displayFulfillmentStatus: string;
+          totalPriceSet: {
+            shopMoney: {
+              amount: string;
+              currencyCode: string;
+            };
+          };
+          customer: {
+            firstName: string | null;
+            lastName: string | null;
+            email: string | null;
+          } | null;
+          shippingAddress: {
+            city: string | null;
+            province: string | null;
+          } | null;
           lineItems: {
             edges: Array<{
               node: {
@@ -44,7 +78,7 @@ interface OrdersQueryResponse {
   };
 }
 
-// Query GraphQL per ottenere ordini non evasi (pagati)
+// Query GraphQL per ottenere ordini non evasi
 const UNFULFILLED_ORDERS_QUERY = `
   query UnfulfilledOrders($cursor: String) {
     orders(
@@ -58,8 +92,24 @@ const UNFULFILLED_ORDERS_QUERY = `
           id
           name
           tags
+          createdAt
           displayFinancialStatus
           displayFulfillmentStatus
+          totalPriceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+          }
+          customer {
+            firstName
+            lastName
+            email
+          }
+          shippingAddress {
+            city
+            province
+          }
           lineItems(first: 250) {
             edges {
               node {
@@ -101,11 +151,18 @@ const UNFULFILLED_ORDERS_QUERY = `
  * in ordini parzialmente evasi.
  * 
  * Traccia separatamente i contrassegni con tag "ACCETTATO".
+ * Raccoglie anche gli ordini COD non confermati (senza tag ACCETTATO).
  */
 export async function getAggregatedProducts(
   admin: AdminApiContext
-): Promise<{ products: AggregatedProduct[]; orderCount: number; codAcceptedCount: number }> {
+): Promise<{
+  products: AggregatedProduct[];
+  orderCount: number;
+  codAcceptedCount: number;
+  unconfirmedCodOrders: UnconfirmedCodOrder[];
+}> {
   const productMap = new Map<string, AggregatedProduct>();
+  const unconfirmedCodOrders: UnconfirmedCodOrder[] = [];
   let hasNextPage = true;
   let cursor: string | null = null;
   let orderCount = 0;
@@ -147,6 +204,40 @@ export async function getAggregatedProducts(
 
       if (isCodAccepted) {
         codAcceptedCount++;
+      }
+
+      // Se è un COD senza tag ACCETTATO, aggiungilo alla lista "da confermare"
+      if (isCOD && !hasAcceptedTag) {
+        const customerFirstName = order.customer?.firstName || "";
+        const customerLastName = order.customer?.lastName || "";
+        const customerName = [customerFirstName, customerLastName]
+          .filter(Boolean)
+          .join(" ") || "Cliente sconosciuto";
+
+        const items = order.lineItems.edges
+          .filter((e) => e.node.currentQuantity > 0)
+          .map((e) => ({
+            title: e.node.variantTitle
+              ? `${e.node.title} - ${e.node.variantTitle}`
+              : e.node.title,
+            quantity: e.node.currentQuantity,
+          }));
+
+        const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+
+        unconfirmedCodOrders.push({
+          id: order.id,
+          name: order.name,
+          createdAt: order.createdAt,
+          totalPrice: order.totalPriceSet.shopMoney.amount,
+          currencyCode: order.totalPriceSet.shopMoney.currencyCode,
+          customerName,
+          customerEmail: order.customer?.email || "",
+          shippingCity: order.shippingAddress?.city || "",
+          shippingProvince: order.shippingAddress?.province || "",
+          itemCount,
+          items,
+        });
       }
 
       orderCount++;
@@ -201,5 +292,10 @@ export async function getAggregatedProducts(
     (a, b) => b.totalQuantity - a.totalQuantity
   );
 
-  return { products, orderCount, codAcceptedCount };
+  // Ordina COD non confermati per data (più vecchi prima)
+  unconfirmedCodOrders.sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  return { products, orderCount, codAcceptedCount, unconfirmedCodOrders };
 }

@@ -41,6 +41,7 @@ import { ProductsNeededTable } from "../components/ProductsNeededTable";
 import { IncomingProductForm } from "../components/IncomingProductForm";
 import { IncomingProductList } from "../components/IncomingProductList";
 import { DifferenceTable } from "../components/DifferenceTable";
+import { UnconfirmedCodList } from "../components/UnconfirmedCodList";
 
 // --- LOADER: carica dati ordini + merce in arrivo ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -64,6 +65,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     products: orderData.products,
     orderCount: orderData.orderCount,
     codAcceptedCount: orderData.codAcceptedCount,
+    unconfirmedCodOrders: orderData.unconfirmedCodOrders,
     incomingItems,
     incomingMap,
     lastUpdated: new Date().toISOString(),
@@ -181,7 +183,7 @@ function StatCard({
 
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
-  const { products, orderCount, codAcceptedCount, incomingItems, incomingMap, lastUpdated } =
+  const { products, orderCount, codAcceptedCount, unconfirmedCodOrders, incomingItems, incomingMap, lastUpdated } =
     useLoaderData<typeof loader>();
 
   const navigation = useNavigation();
@@ -230,6 +232,11 @@ export default function OrderManagerIndex() {
       id: "riepilogo",
       content: "📊 Riepilogo differenze",
       panelID: "riepilogo-panel",
+    },
+    {
+      id: "cod-non-confermati",
+      content: `⚠️ COD da confermare (${unconfirmedCodOrders.length})`,
+      panelID: "cod-panel",
     },
   ];
 
@@ -344,6 +351,9 @@ export default function OrderManagerIndex() {
               )}
               {selectedTab === 2 && (
                 <DifferenceTable products={products} incomingMap={incomingMap} />
+              )}
+              {selectedTab === 3 && (
+                <UnconfirmedCodList orders={unconfirmedCodOrders} />
               )}
             </Box>
           </Tabs>
