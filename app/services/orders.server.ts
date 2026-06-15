@@ -48,15 +48,6 @@ interface OrdersQueryResponse {
               currencyCode?: string;
             };
           };
-          customer?: {
-            firstName?: string | null;
-            lastName?: string | null;
-            email?: string | null;
-          } | null;
-          shippingAddress?: {
-            city?: string | null;
-            province?: string | null;
-          } | null;
           lineItems: {
             edges: Array<{
               node: {
@@ -100,15 +91,6 @@ const UNFULFILLED_ORDERS_QUERY = `
               amount
               currencyCode
             }
-          }
-          customer {
-            firstName
-            lastName
-            email
-          }
-          shippingAddress {
-            city
-            province
           }
           lineItems(first: 250) {
             edges {
@@ -178,12 +160,25 @@ export async function getAggregatedProducts(
   ]);
 
   while (hasNextPage) {
-    const response = (await admin.graphql(UNFULFILLED_ORDERS_QUERY, {
-      variables: { cursor },
-    })) as Response;
+    try {
+      const response = (await admin.graphql(UNFULFILLED_ORDERS_QUERY, {
+        variables: { cursor },
+      })) as Response;
 
-    const json = (await response.json()) as OrdersQueryResponse;
-    const { orders } = json.data;
+      const json = (await response.json()) as any;
+      
+      if (json.errors) {
+        console.error("GraphQL Errors:", JSON.stringify(json.errors, null, 2));
+        // Se c'è un errore, smettiamo di ciclare ma non crashiamo
+        break;
+      }
+
+      if (!json.data || !json.data.orders) {
+        console.error("GraphQL Response missing data.orders:", json);
+        break;
+      }
+
+      const { orders } = json.data;
 
     for (const edge of orders.edges) {
       const order = edge.node;
@@ -209,12 +204,7 @@ export async function getAggregatedProducts(
 
       // Se è un COD senza tag ACCETTATO, aggiungilo alla lista "da confermare"
       if (isCOD && !hasAcceptedTag) {
-        const customerFirstName = order.customer?.firstName || "";
-        const customerLastName = order.customer?.lastName || "";
-        const customerName = [customerFirstName, customerLastName]
-          .filter(Boolean)
-          .join(" ") || "Cliente sconosciuto";
-
+        const customerName = "Cliente"; // Rimosso per limiti permessi Shopify Protected Data
         const items = order.lineItems.edges
           .filter((e) => e.node.currentQuantity > 0)
           .map((e) => ({
@@ -233,9 +223,9 @@ export async function getAggregatedProducts(
           totalPrice: order.totalPriceSet?.shopMoney?.amount || "0",
           currencyCode: order.totalPriceSet?.shopMoney?.currencyCode || "EUR",
           customerName,
-          customerEmail: order.customer?.email || "",
-          shippingCity: order.shippingAddress?.city || "",
-          shippingProvince: order.shippingAddress?.province || "",
+          customerEmail: "",
+          shippingCity: "",
+          shippingProvince: "",
           itemCount,
           items,
         });
@@ -286,6 +276,10 @@ export async function getAggregatedProducts(
 
     hasNextPage = orders.pageInfo.hasNextPage;
     cursor = orders.pageInfo.endCursor;
+    } catch (error) {
+      console.error("Caught error in GraphQL fetch:", error);
+      break;
+    }
   }
 
   // Ordina per quantità decrescente
