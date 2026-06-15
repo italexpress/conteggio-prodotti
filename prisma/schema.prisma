@@ -9,8 +9,8 @@ generator client {
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -31,4 +31,21 @@ model Session {
   emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+}
+
+model IncomingProduct {
+  id                  String    @id @default(cuid())
+  shop                String
+  productId           String    // Shopify Product GID (gid://shopify/Product/xxx)
+  variantId           String    // Shopify Variant GID (gid://shopify/ProductVariant/xxx)
+  productTitle        String    // Nome prodotto originale Shopify
+  variantTitle        String    // Nome variante (es. "Blu / M")
+  displayName         String    // Nome combinato visibile (es. "Pantaloni Capri Blu M")
+  quantity            Int
+  expectedArrivalDate DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([shop])
+  @@index([shop, variantId])
 }
