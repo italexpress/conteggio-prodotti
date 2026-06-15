@@ -63,6 +63,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return json({
     products: orderData.products,
     orderCount: orderData.orderCount,
+    codAcceptedCount: orderData.codAcceptedCount,
     incomingItems,
     incomingMap,
     lastUpdated: new Date().toISOString(),
@@ -180,7 +181,7 @@ function StatCard({
 
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
-  const { products, orderCount, incomingItems, incomingMap, lastUpdated } =
+  const { products, orderCount, codAcceptedCount, incomingItems, incomingMap, lastUpdated } =
     useLoaderData<typeof loader>();
 
   const navigation = useNavigation();
@@ -200,6 +201,7 @@ export default function OrderManagerIndex() {
   // Calcola statistiche
   const totalItems = products.reduce((sum, p) => sum + p.totalQuantity, 0);
   const totalCod = products.reduce((sum, p) => sum + p.codQuantity, 0);
+  const totalCodAccepted = products.reduce((sum, p) => sum + p.codAcceptedQuantity, 0);
   const totalIncoming = Object.values(incomingMap).reduce((sum, q) => sum + q, 0);
 
   // Calcola copertura
@@ -274,16 +276,16 @@ export default function OrderManagerIndex() {
               value={totalCod}
               icon={DeliveryIcon}
               tone="warning"
-              subtitle="Pagamento alla consegna"
+              subtitle={`${totalCodAccepted} pz accettati su ${totalCod}`}
             />
           </Layout.Section>
           <Layout.Section variant="oneQuarter">
             <StatCard
-              title="Merce in arrivo"
-              value={totalIncoming}
+              title="COD Accettati ✅"
+              value={totalCodAccepted}
               icon={CheckCircleIcon}
               tone="success"
-              subtitle={`${incomingItems.length} registrazioni`}
+              subtitle={`${codAcceptedCount} ordini con tag ACCETTATO`}
             />
           </Layout.Section>
         </Layout>

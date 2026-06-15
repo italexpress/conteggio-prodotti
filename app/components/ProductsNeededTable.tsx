@@ -67,6 +67,21 @@ export function ProductsNeededTable({
           </Text>
         )}
       </IndexTable.Cell>
+      <IndexTable.Cell>
+        {product.codAcceptedQuantity > 0 ? (
+          <Badge tone="success" size="medium">
+            ✅ {String(product.codAcceptedQuantity)}
+          </Badge>
+        ) : product.codQuantity > 0 ? (
+          <Badge tone="critical" size="medium">
+            ✗ 0
+          </Badge>
+        ) : (
+          <Text variant="bodyMd" as="span" tone="subdued">
+            —
+          </Text>
+        )}
+      </IndexTable.Cell>
     </IndexTable.Row>
   ));
 
@@ -114,6 +129,7 @@ export function ProductsNeededTable({
             { title: "Prodotto" },
             { title: "Quantità" },
             { title: "Contrassegno" },
+            { title: "COD Accettati" },
           ]}
           selectable={false}
         >

@@ -9,6 +9,7 @@ export interface AggregatedProduct {
   displayName: string;
   totalQuantity: number;
   codQuantity: number;
+  codAcceptedQuantity: number; // Contrassegni con tag "ACCETTATO"
 }
 
 // Tipo per la risposta della query GraphQL
@@ -19,6 +20,7 @@ interface OrdersQueryResponse {
         node: {
           id: string;
           name: string;
+          tags: string[];
           displayFinancialStatus: string;
           displayFulfillmentStatus: string;
           lineItems: {
@@ -55,6 +57,7 @@ const UNFULFILLED_ORDERS_QUERY = `
         node {
           id
           name
+          tags
           displayFinancialStatus
           displayFulfillmentStatus
           lineItems(first: 250) {
@@ -96,14 +99,17 @@ const UNFULFILLED_ORDERS_QUERY = `
  * 
  * Usa currentQuantity per tenere conto delle quantità già evase
  * in ordini parzialmente evasi.
+ * 
+ * Traccia separatamente i contrassegni con tag "ACCETTATO".
  */
 export async function getAggregatedProducts(
   admin: AdminApiContext
-): Promise<{ products: AggregatedProduct[]; orderCount: number }> {
+): Promise<{ products: AggregatedProduct[]; orderCount: number; codAcceptedCount: number }> {
   const productMap = new Map<string, AggregatedProduct>();
   let hasNextPage = true;
   let cursor: string | null = null;
   let orderCount = 0;
+  let codAcceptedCount = 0;
 
   // Status finanziari accettati
   const acceptedFinancialStatuses = new Set([
@@ -131,6 +137,17 @@ export async function getAggregatedProducts(
       }
 
       const isCOD = order.displayFinancialStatus === "PENDING";
+      
+      // Controlla se l'ordine ha il tag "ACCETTATO" (case-insensitive)
+      const hasAcceptedTag = order.tags.some(
+        (tag) => tag.toUpperCase() === "ACCETTATO"
+      );
+      
+      const isCodAccepted = isCOD && hasAcceptedTag;
+
+      if (isCodAccepted) {
+        codAcceptedCount++;
+      }
 
       orderCount++;
 
@@ -157,6 +174,9 @@ export async function getAggregatedProducts(
           if (isCOD) {
             existing.codQuantity += item.currentQuantity;
           }
+          if (isCodAccepted) {
+            existing.codAcceptedQuantity += item.currentQuantity;
+          }
         } else {
           productMap.set(variantId, {
             productId,
@@ -166,6 +186,7 @@ export async function getAggregatedProducts(
             displayName,
             totalQuantity: item.currentQuantity,
             codQuantity: isCOD ? item.currentQuantity : 0,
+            codAcceptedQuantity: isCodAccepted ? item.currentQuantity : 0,
           });
         }
       }
@@ -180,5 +201,5 @@ export async function getAggregatedProducts(
     (a, b) => b.totalQuantity - a.totalQuantity
   );
 
-  return { products, orderCount };
+  return { products, orderCount, codAcceptedCount };
 }
