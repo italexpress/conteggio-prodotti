@@ -1,5 +1,4 @@
 import {
-  Card,
   IndexTable,
   Text,
   TextField,
@@ -7,6 +6,7 @@ import {
   BlockStack,
   InlineStack,
   Box,
+  EmptyState,
 } from "@shopify/polaris";
 import { useState, useMemo } from "react";
 import type { AggregatedProduct } from "../services/orders.server";
@@ -63,60 +63,69 @@ export function ProductsNeededTable({
           </Badge>
         ) : (
           <Text variant="bodyMd" as="span" tone="subdued">
-            0
+            —
           </Text>
         )}
       </IndexTable.Cell>
     </IndexTable.Row>
   ));
 
+  if (products.length === 0) {
+    return (
+      <EmptyState
+        heading="Nessun ordine da evadere 🎉"
+        image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+      >
+        <p>Tutti gli ordini sono stati evasi. Ottimo lavoro!</p>
+      </EmptyState>
+    );
+  }
+
   return (
-    <Card>
-      <BlockStack gap="400">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text variant="headingMd" as="h2">
-            Prodotti necessari per evadere gli ordini
-          </Text>
-          <InlineStack gap="200">
-            <Badge tone="info">{orderCount} ordini aperti</Badge>
+    <BlockStack gap="400">
+      <InlineStack align="space-between" blockAlign="center">
+        <Text variant="headingSm" as="h3">
+          Lista prodotti da preparare
+        </Text>
+        <InlineStack gap="200">
+          <Badge>{filteredProducts.length} prodotti</Badge>
+          <Badge tone="attention">{totalItems} pz totali</Badge>
+          {totalCod > 0 && (
             <Badge tone="warning">{totalCod} in contrassegno</Badge>
-            <Badge>{totalItems} pezzi totali</Badge>
-          </InlineStack>
+          )}
         </InlineStack>
+      </InlineStack>
 
-        <TextField
-          label=""
-          labelHidden
-          value={searchValue}
-          onChange={setSearchValue}
-          placeholder="Cerca prodotto..."
-          clearButton
-          onClearButtonClick={() => setSearchValue("")}
-          autoComplete="off"
-        />
+      <TextField
+        label=""
+        labelHidden
+        value={searchValue}
+        onChange={setSearchValue}
+        placeholder="🔍 Cerca prodotto..."
+        clearButton
+        onClearButtonClick={() => setSearchValue("")}
+        autoComplete="off"
+      />
 
-        {filteredProducts.length > 0 ? (
-          <IndexTable
-            itemCount={filteredProducts.length}
-            headings={[
-              { title: "Prodotto" },
-              { title: "Quantità totale" },
-              { title: "Di cui contrassegno" },
-            ]}
-            selectable={false}
-          >
-            {rowMarkup}
-          </IndexTable>
-        ) : (
-          <Box padding="400">
-            <Text as="p" alignment="center" tone="subdued">
-              {searchValue
-                ? "Nessun prodotto trovato per la ricerca"
-                : "Nessun ordine da evadere 🎉"}
-            </Text>
-          </Box>
-        )}
-      </BlockStack>
-    </Card>
+      {filteredProducts.length > 0 ? (
+        <IndexTable
+          itemCount={filteredProducts.length}
+          headings={[
+            { title: "Prodotto" },
+            { title: "Quantità" },
+            { title: "Contrassegno" },
+          ]}
+          selectable={false}
+        >
+          {rowMarkup}
+        </IndexTable>
+      ) : (
+        <Box padding="400">
+          <Text as="p" alignment="center" tone="subdued">
+            Nessun prodotto trovato per "{searchValue}"
+          </Text>
+        </Box>
+      )}
+    </BlockStack>
   );
 }

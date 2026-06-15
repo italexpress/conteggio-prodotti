@@ -1,5 +1,4 @@
 import {
-  Card,
   ResourceList,
   ResourceItem,
   Text,
@@ -9,6 +8,7 @@ import {
   BlockStack,
   Box,
   Divider,
+  EmptyState,
 } from "@shopify/polaris";
 import { useFetcher } from "@remix-run/react";
 import type { IncomingProductData } from "../services/incoming.server";
@@ -22,80 +22,78 @@ export function IncomingProductList({ items }: IncomingProductListProps) {
 
   if (items.length === 0) {
     return (
-      <Card>
-        <BlockStack gap="300">
-          <Text variant="headingMd" as="h2">
-            Merce registrata
+      <BlockStack gap="300">
+        <Text variant="headingSm" as="h3">
+          📋 Merce registrata
+        </Text>
+        <Box padding="400">
+          <Text as="p" alignment="center" tone="subdued">
+            Nessuna merce in arrivo registrata. Usa il form qui sopra per aggiungerne.
           </Text>
-          <Box padding="400">
-            <Text as="p" alignment="center" tone="subdued">
-              Nessuna merce in arrivo registrata.
-            </Text>
-          </Box>
-        </BlockStack>
-      </Card>
+        </Box>
+      </BlockStack>
     );
   }
 
   return (
-    <Card>
-      <BlockStack gap="300">
-        <Text variant="headingMd" as="h2">
-          Merce registrata ({items.length})
+    <BlockStack gap="300">
+      <InlineStack align="space-between" blockAlign="center">
+        <Text variant="headingSm" as="h3">
+          📋 Merce registrata
         </Text>
-        <Divider />
-        <ResourceList
-          items={items}
-          renderItem={(item) => {
-            const isDeleting =
-              fetcher.state === "submitting" &&
-              fetcher.formData?.get("deleteId") === item.id;
+        <Badge tone="info">{items.length} registrazioni</Badge>
+      </InlineStack>
+      <ResourceList
+        items={items}
+        renderItem={(item) => {
+          const isDeleting =
+            fetcher.state === "submitting" &&
+            fetcher.formData?.get("deleteId") === item.id;
 
-            return (
-              <ResourceItem
-                id={item.id}
-                accessibilityLabel={`Merce in arrivo: ${item.displayName}`}
-              >
-                <InlineStack align="space-between" blockAlign="center">
-                  <BlockStack gap="100">
-                    <Text variant="bodyMd" fontWeight="semibold" as="span">
-                      {item.displayName}
-                    </Text>
-                    <InlineStack gap="200">
-                      <Badge tone="info">{item.quantity} pz</Badge>
-                      {item.expectedArrivalDate && (
-                        <Badge>
-                          Arrivo:{" "}
-                          {new Date(
-                            item.expectedArrivalDate
-                          ).toLocaleDateString("it-IT", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          })}
-                        </Badge>
-                      )}
-                    </InlineStack>
-                  </BlockStack>
-                  <Button
-                    variant="plain"
-                    tone="critical"
-                    onClick={() => {
-                      fetcher.submit(
-                        { intent: "deleteIncoming", deleteId: item.id },
-                        { method: "post" }
-                      );
-                    }}
-                    loading={isDeleting}
-                  >
-                    Elimina
-                  </Button>
-                </InlineStack>
-              </ResourceItem>
-            );
-          }}
-        />
-      </BlockStack>
-    </Card>
+          return (
+            <ResourceItem
+              id={item.id}
+              accessibilityLabel={`Merce in arrivo: ${item.displayName}`}
+            >
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text variant="bodyMd" fontWeight="semibold" as="span">
+                    {item.displayName}
+                  </Text>
+                  <InlineStack gap="200">
+                    <Badge tone="info">{item.quantity} pz</Badge>
+                    {item.expectedArrivalDate && (
+                      <Badge>
+                        📅 Arrivo:{" "}
+                        {new Date(
+                          item.expectedArrivalDate
+                        ).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </Badge>
+                    )}
+                  </InlineStack>
+                </BlockStack>
+                <Button
+                  variant="plain"
+                  tone="critical"
+                  onClick={() => {
+                    fetcher.submit(
+                      { intent: "deleteIncoming", deleteId: item.id },
+                      { method: "post" }
+                    );
+                  }}
+                  loading={isDeleting}
+                >
+                  🗑️ Elimina
+                </Button>
+              </InlineStack>
+            </ResourceItem>
+          );
+        }}
+      />
+    </BlockStack>
   );
 }

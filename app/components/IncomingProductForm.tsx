@@ -9,6 +9,7 @@ import {
   DatePicker,
   Popover,
   Icon,
+  Banner,
 } from "@shopify/polaris";
 import { CalendarIcon } from "@shopify/polaris-icons";
 import { useState, useCallback, useMemo } from "react";
@@ -22,6 +23,7 @@ interface IncomingProductFormProps {
 export function IncomingProductForm({ products }: IncomingProductFormProps) {
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state === "submitting";
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -70,6 +72,10 @@ export function IncomingProductForm({ products }: IncomingProductFormProps) {
     setSelectedVariantId("");
     setQuantity("");
     setSelectedDate(null);
+
+    // Mostra messaggio di successo temporaneo
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 3000);
   }, [selectedProduct, quantity, selectedDate, fetcher]);
 
   const handleMonthChange = useCallback(
@@ -94,72 +100,75 @@ export function IncomingProductForm({ products }: IncomingProductFormProps) {
     : "";
 
   return (
-    <Card>
-      <BlockStack gap="400">
-        <Text variant="headingMd" as="h2">
-          Merce in arrivo
-        </Text>
+    <BlockStack gap="400">
+      <Text variant="headingSm" as="h3">
+        ➕ Registra nuova merce in arrivo
+      </Text>
 
-        <Text as="p" tone="subdued">
-          Registra i prodotti già ordinati ai fornitori che non sono ancora
-          arrivati.
-        </Text>
+      <Text as="p" tone="subdued">
+        Registra i prodotti già ordinati ai fornitori che stanno arrivando.
+      </Text>
 
-        <Select
-          label="Prodotto"
-          options={productOptions}
-          value={selectedVariantId}
-          onChange={setSelectedVariantId}
-        />
+      {showSuccess && (
+        <Banner tone="success" onDismiss={() => setShowSuccess(false)}>
+          <p>Merce registrata con successo! ✅</p>
+        </Banner>
+      )}
 
-        <TextField
-          label="Quantità in arrivo"
-          type="number"
-          value={quantity}
-          onChange={setQuantity}
-          min={1}
-          autoComplete="off"
-        />
+      <Select
+        label="Prodotto"
+        options={productOptions}
+        value={selectedVariantId}
+        onChange={setSelectedVariantId}
+      />
 
-        <Popover
-          active={datePopoverActive}
-          activator={
-            <TextField
-              label="Data prevista arrivo (opzionale)"
-              value={formattedDate}
-              onFocus={() => setDatePopoverActive(true)}
-              autoComplete="off"
-              prefix={<Icon source={CalendarIcon} />}
-              placeholder="Seleziona una data..."
-              readOnly
-            />
-          }
-          onClose={() => setDatePopoverActive(false)}
-          preferredAlignment="left"
+      <TextField
+        label="Quantità in arrivo"
+        type="number"
+        value={quantity}
+        onChange={setQuantity}
+        min={1}
+        autoComplete="off"
+      />
+
+      <Popover
+        active={datePopoverActive}
+        activator={
+          <TextField
+            label="Data prevista arrivo (opzionale)"
+            value={formattedDate}
+            onFocus={() => setDatePopoverActive(true)}
+            autoComplete="off"
+            prefix={<Icon source={CalendarIcon} />}
+            placeholder="Seleziona una data..."
+            readOnly
+          />
+        }
+        onClose={() => setDatePopoverActive(false)}
+        preferredAlignment="left"
+      >
+        <div style={{ padding: "16px" }}>
+          <DatePicker
+            month={month}
+            year={year}
+            onChange={handleDateSelection}
+            onMonthChange={handleMonthChange}
+            selected={selectedDate || undefined}
+            disableDatesBefore={new Date()}
+          />
+        </div>
+      </Popover>
+
+      <InlineStack align="end">
+        <Button
+          variant="primary"
+          onClick={handleSubmit}
+          loading={isSubmitting}
+          disabled={!selectedVariantId || !quantity || parseInt(quantity) <= 0}
         >
-          <div style={{ padding: "16px" }}>
-            <DatePicker
-              month={month}
-              year={year}
-              onChange={handleDateSelection}
-              onMonthChange={handleMonthChange}
-              selected={selectedDate || undefined}
-              disableDatesBefore={new Date()}
-            />
-          </div>
-        </Popover>
-
-        <InlineStack align="end">
-          <Button
-            variant="primary"
-            onClick={handleSubmit}
-            loading={isSubmitting}
-            disabled={!selectedVariantId || !quantity || parseInt(quantity) <= 0}
-          >
-            Aggiungi
-          </Button>
-        </InlineStack>
-      </BlockStack>
-    </Card>
+          ➕ Aggiungi merce
+        </Button>
+      </InlineStack>
+    </BlockStack>
   );
 }
