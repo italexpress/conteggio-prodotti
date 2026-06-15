@@ -42,20 +42,20 @@ interface OrdersQueryResponse {
           createdAt: string;
           displayFinancialStatus: string;
           displayFulfillmentStatus: string;
-          totalPriceSet: {
-            shopMoney: {
-              amount: string;
-              currencyCode: string;
+          totalPriceSet?: {
+            shopMoney?: {
+              amount?: string;
+              currencyCode?: string;
             };
           };
-          customer: {
-            firstName: string | null;
-            lastName: string | null;
-            email: string | null;
+          customer?: {
+            firstName?: string | null;
+            lastName?: string | null;
+            email?: string | null;
           } | null;
-          shippingAddress: {
-            city: string | null;
-            province: string | null;
+          shippingAddress?: {
+            city?: string | null;
+            province?: string | null;
           } | null;
           lineItems: {
             edges: Array<{
@@ -196,7 +196,8 @@ export async function getAggregatedProducts(
       const isCOD = order.displayFinancialStatus === "PENDING";
       
       // Controlla se l'ordine ha il tag "ACCETTATO" (case-insensitive)
-      const hasAcceptedTag = order.tags.some(
+      const orderTags = order.tags || [];
+      const hasAcceptedTag = orderTags.some(
         (tag) => tag.toUpperCase() === "ACCETTATO"
       );
       
@@ -229,8 +230,8 @@ export async function getAggregatedProducts(
           id: order.id,
           name: order.name,
           createdAt: order.createdAt,
-          totalPrice: order.totalPriceSet.shopMoney.amount,
-          currencyCode: order.totalPriceSet.shopMoney.currencyCode,
+          totalPrice: order.totalPriceSet?.shopMoney?.amount || "0",
+          currencyCode: order.totalPriceSet?.shopMoney?.currencyCode || "EUR",
           customerName,
           customerEmail: order.customer?.email || "",
           shippingCity: order.shippingAddress?.city || "",
