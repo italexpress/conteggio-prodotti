@@ -140,16 +140,70 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         variantId,
         displayName,
       });
+
+      // Aggiorna Shopify: togli la spunta "Continua a vendere quando esaurito"
+      const { admin } = await authenticate.admin(request);
+      try {
+        await admin.graphql(
+          `mutation updateVariant($input: ProductVariantInput!) {
+            productVariantUpdate(input: $input) {
+              userErrors {
+                message
+              }
+            }
+          }`,
+          {
+            variables: {
+              input: {
+                id: variantId,
+                inventoryPolicy: "DENY",
+              },
+            },
+          }
+        );
+      } catch (err) {
+        console.error("Failed to update inventory policy on Shopify:", err);
+        // Non blocchiamo l'azione locale se Shopify fallisce (es. permessi mancanti)
+      }
+
       return json({ success: true });
     }
 
     case "removeOutOfStock": {
       const deleteId = formData.get("id") as string;
+      const variantId = formData.get("variantId") as string;
       if (!deleteId) {
         return json({ error: "ID mancante" }, { status: 400 });
       }
 
       await removeOutOfStockProduct(deleteId, shop);
+
+      // Aggiorna Shopify: rimetti la spunta "Continua a vendere quando esaurito"
+      if (variantId) {
+        const { admin } = await authenticate.admin(request);
+        try {
+          await admin.graphql(
+            `mutation updateVariant($input: ProductVariantInput!) {
+              productVariantUpdate(input: $input) {
+                userErrors {
+                  message
+                }
+              }
+            }`,
+            {
+              variables: {
+                input: {
+                  id: variantId,
+                  inventoryPolicy: "CONTINUE",
+                },
+              },
+            }
+          );
+        } catch (err) {
+          console.error("Failed to restore inventory policy on Shopify:", err);
+        }
+      }
+
       return json({ success: true });
     }
 

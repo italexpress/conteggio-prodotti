@@ -79,7 +79,7 @@ export function TerminatedProductsList({
                   onClick={(e) => {
                     e.stopPropagation();
                     fetcher.submit(
-                      { intent: "removeOutOfStock", id: product.id },
+                      { intent: "removeOutOfStock", id: product.id, variantId: product.variantId },
                       { method: "post" }
                     );
                   }}
