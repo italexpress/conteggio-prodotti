@@ -2,7 +2,7 @@
 
 client_id = "298ec2d6bac95312721ca4a715f1c0cd"
 name = "Conteggio Prodotti"
-application_url = "https://ensuring-ensures-washing-veterans.trycloudflare.com"
+application_url = "https://conteggio-prodotti.vercel.app"
 embedded = true
 
 [build]
@@ -20,7 +20,7 @@ api_version = "2026-07"
 scopes = "read_orders,read_products,write_products"
 
 [auth]
-redirect_urls = [ "https://ensuring-ensures-washing-veterans.trycloudflare.com/api/auth/callback" ]
+redirect_urls = [ "https://conteggio-prodotti.vercel.app/auth/callback", "https://conteggio-prodotti.vercel.app/api/auth/callback" ]
 
 [pos]
 embedded = false
