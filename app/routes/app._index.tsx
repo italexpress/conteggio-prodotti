@@ -196,7 +196,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         // 3. Togli la spunta (imposta policy a DENY)
-        await admin.graphql(
+        const variantUpdateRes = await admin.graphql(
           `mutation updateVariant($input: ProductVariantInput!) {
             productVariantUpdate(input: $input) {
               userErrors {
@@ -213,6 +213,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             },
           }
         );
+        const variantUpdateData = await variantUpdateRes.json();
+        if (variantUpdateData.data?.productVariantUpdate?.userErrors?.length > 0) {
+           console.error("Variant Update Errors:", variantUpdateData.data.productVariantUpdate.userErrors);
+        }
       } catch (err) {
         console.error("Failed to update inventory on Shopify:", err);
         // Non blocchiamo l'azione locale se Shopify fallisce (es. permessi mancanti)
@@ -254,6 +258,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         } catch (err) {
           console.error("Failed to restore inventory policy on Shopify:", err);
         }
+      }
+
+      return json({ success: true });
+    }
+
+    case "acceptCod": {
+      const orderId = formData.get("orderId") as string;
+      if (!orderId) {
+        return json({ error: "ID ordine mancante" }, { status: 400 });
+      }
+
+      const { admin } = await authenticate.admin(request);
+      
+      try {
+        const response = await admin.graphql(
+          `mutation addTags($id: ID!, $tags: [String!]!) {
+            tagsAdd(id: $id, tags: $tags) {
+              userErrors {
+                message
+              }
+            }
+          }`,
+          {
+            variables: {
+              id: orderId,
+              tags: ["ACCETTATO"],
+            },
+          }
+        );
+        const responseData = await response.json();
+        if (responseData.data?.tagsAdd?.userErrors?.length > 0) {
+           console.error("Tags Add Errors:", responseData.data.tagsAdd.userErrors);
+        }
+      } catch (err) {
+        console.error("Failed to add tag to order on Shopify:", err);
       }
 
       return json({ success: true });
