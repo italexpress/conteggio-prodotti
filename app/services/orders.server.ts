@@ -30,6 +30,15 @@ export interface UnconfirmedCodOrder {
   }>;
 }
 
+// Tipo per un ordine che contiene un prodotto specifico
+export interface AffectedOrder {
+  id: string;
+  name: string;
+  createdAt: string;
+  customerName: string;
+  quantity: number; // Quantità di QUEL prodotto in questo ordine
+}
+
 // Tipo per la risposta della query GraphQL
 interface OrdersQueryResponse {
   data: {
@@ -142,9 +151,12 @@ export async function getAggregatedProducts(
   orderCount: number;
   codAcceptedCount: number;
   unconfirmedCodOrders: UnconfirmedCodOrder[];
+  affectedOrdersMap: Record<string, AffectedOrder[]>;
 }> {
   const productMap = new Map<string, AggregatedProduct>();
   const unconfirmedCodOrders: UnconfirmedCodOrder[] = [];
+  const affectedOrdersMap: Record<string, AffectedOrder[]> = {};
+  
   let hasNextPage = true;
   let cursor: string | null = null;
   let orderCount = 0;
@@ -245,6 +257,18 @@ export async function getAggregatedProducts(
         const variantId = item.variant.id;
         const productId = item.product.id;
 
+        // Aggiungi all'affectedOrdersMap
+        if (!affectedOrdersMap[variantId]) {
+          affectedOrdersMap[variantId] = [];
+        }
+        affectedOrdersMap[variantId].push({
+          id: order.id,
+          name: order.name,
+          createdAt: order.createdAt,
+          customerName: "Cliente", // Shopify limit bypass
+          quantity: item.currentQuantity,
+        });
+
         // Costruisci il nome display combinando titolo prodotto + variante
         const displayName = item.variantTitle
           ? `${item.title} - ${item.variantTitle}`
@@ -292,5 +316,5 @@ export async function getAggregatedProducts(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
-  return { products, orderCount, codAcceptedCount, unconfirmedCodOrders };
+  return { products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap };
 }

@@ -36,12 +36,18 @@ import {
   addIncomingProduct,
   deleteIncomingProduct,
 } from "../services/incoming.server";
+import {
+  getOutOfStockProducts,
+  addOutOfStockProduct,
+  removeOutOfStockProduct,
+} from "../services/out-of-stock.server";
 
 import { ProductsNeededTable } from "../components/ProductsNeededTable";
 import { IncomingProductForm } from "../components/IncomingProductForm";
 import { IncomingProductList } from "../components/IncomingProductList";
 import { DifferenceTable } from "../components/DifferenceTable";
 import { UnconfirmedCodList } from "../components/UnconfirmedCodList";
+import { TerminatedProductsList } from "../components/TerminatedProductsList";
 
 // --- LOADER: carica dati ordini + merce in arrivo ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -49,10 +55,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = session.shop;
 
   // Carica in parallelo ordini aggregati e merce in arrivo
-  const [orderData, incomingItems, incomingAggregated] = await Promise.all([
+  const [orderData, incomingItems, incomingAggregated, outOfStockProducts] = await Promise.all([
     getAggregatedProducts(admin),
     getIncomingProducts(shop),
     getAggregatedIncoming(shop),
+    getOutOfStockProducts(shop),
   ]);
 
   // Converti la Map in un oggetto serializzabile per il client
@@ -66,8 +73,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     orderCount: orderData.orderCount,
     codAcceptedCount: orderData.codAcceptedCount,
     unconfirmedCodOrders: orderData.unconfirmedCodOrders,
+    affectedOrdersMap: orderData.affectedOrdersMap,
     incomingItems,
     incomingMap,
+    outOfStockProducts,
     lastUpdated: new Date().toISOString(),
   });
 };
@@ -116,6 +125,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       await deleteIncomingProduct(deleteId, shop);
+      return json({ success: true });
+    }
+
+    case "addOutOfStock": {
+      const variantId = formData.get("variantId") as string;
+      const displayName = formData.get("displayName") as string;
+      if (!variantId || !displayName) {
+        return json({ error: "Dati mancanti" }, { status: 400 });
+      }
+
+      await addOutOfStockProduct({
+        shop,
+        variantId,
+        displayName,
+      });
+      return json({ success: true });
+    }
+
+    case "removeOutOfStock": {
+      const deleteId = formData.get("id") as string;
+      if (!deleteId) {
+        return json({ error: "ID mancante" }, { status: 400 });
+      }
+
+      await removeOutOfStockProduct(deleteId, shop);
       return json({ success: true });
     }
 
@@ -183,7 +217,7 @@ function StatCard({
 
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
-  const { products, orderCount, codAcceptedCount, unconfirmedCodOrders, incomingItems, incomingMap, lastUpdated } =
+  const { products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
     useLoaderData<typeof loader>();
 
   const navigation = useNavigation();
@@ -238,7 +272,15 @@ export default function OrderManagerIndex() {
       content: `⚠️ COD da confermare (${unconfirmedCodOrders.length})`,
       panelID: "cod-panel",
     },
+    {
+      id: "terminati",
+      content: `🚫 Terminati (${outOfStockProducts.length})`,
+      panelID: "terminati-panel",
+    },
   ];
+
+  const outOfStockVariantIds = outOfStockProducts.map(p => p.variantId);
+  const activeProducts = products.filter(p => !outOfStockVariantIds.includes(p.variantId));
 
   return (
     <Page
@@ -338,22 +380,28 @@ export default function OrderManagerIndex() {
             <Box padding="400">
               {selectedTab === 0 && (
                 <ProductsNeededTable
-                  products={products}
+                  products={activeProducts}
                   orderCount={orderCount}
                 />
               )}
               {selectedTab === 1 && (
                 <BlockStack gap="500">
-                  <IncomingProductForm products={products} />
+                  <IncomingProductForm products={activeProducts} />
                   <Divider />
                   <IncomingProductList items={incomingItems} />
                 </BlockStack>
               )}
               {selectedTab === 2 && (
-                <DifferenceTable products={products} incomingMap={incomingMap} />
+                <DifferenceTable products={activeProducts} incomingMap={incomingMap} />
               )}
               {selectedTab === 3 && (
                 <UnconfirmedCodList orders={unconfirmedCodOrders} />
+              )}
+              {selectedTab === 4 && (
+                <TerminatedProductsList
+                  terminatedProducts={outOfStockProducts}
+                  affectedOrdersMap={affectedOrdersMap}
+                />
               )}
             </Box>
           </Tabs>

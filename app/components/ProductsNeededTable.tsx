@@ -10,8 +10,10 @@ import {
   Select,
   ButtonGroup,
   Button,
+  Tooltip,
 } from "@shopify/polaris";
 import { useState, useMemo } from "react";
+import { useFetcher } from "@remix-run/react";
 import type { AggregatedProduct } from "../services/orders.server";
 
 interface ProductsNeededTableProps {
@@ -26,6 +28,7 @@ export function ProductsNeededTable({
   const [searchValue, setSearchValue] = useState("");
   const [viewMode, setViewMode] = useState<"variants" | "grouped">("variants");
   const [sortValue, setSortValue] = useState("qty_desc");
+  const fetcher = useFetcher();
 
   // 1. Applica filtro di ricerca
   const searchFilteredProducts = useMemo(() => {
@@ -151,6 +154,31 @@ export function ProductsNeededTable({
           </Text>
         )}
       </IndexTable.Cell>
+      <IndexTable.Cell>
+        {viewMode === "variants" && (
+          <Tooltip content="Sposta in Prodotti Terminati per contattare i clienti">
+            <Button
+              size="micro"
+              onClick={() => {
+                fetcher.submit(
+                  {
+                    intent: "addOutOfStock",
+                    variantId: product.variantId,
+                    displayName: product.displayName,
+                  },
+                  { method: "post" }
+                );
+              }}
+              loading={
+                fetcher.state === "submitting" &&
+                fetcher.formData?.get("variantId") === product.variantId
+              }
+            >
+              🚫 Terminato
+            </Button>
+          </Tooltip>
+        )}
+      </IndexTable.Cell>
     </IndexTable.Row>
   ));
 
@@ -231,6 +259,7 @@ export function ProductsNeededTable({
             { title: "Quantità" },
             { title: "Contrassegno" },
             { title: "COD Accettati" },
+            { title: viewMode === "variants" ? "Azione" : "" },
           ]}
           selectable={false}
         >
