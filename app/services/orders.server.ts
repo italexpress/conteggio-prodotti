@@ -49,6 +49,7 @@ interface OrdersQueryResponse {
           name: string;
           tags: string[];
           createdAt: string;
+          paymentGatewayNames: string[];
           displayFinancialStatus: string;
           displayFulfillmentStatus: string;
           totalPriceSet?: {
@@ -93,6 +94,7 @@ const UNFULFILLED_ORDERS_QUERY = `
           name
           tags
           createdAt
+          paymentGatewayNames
           displayFinancialStatus
           displayFulfillmentStatus
           totalPriceSet {
@@ -200,7 +202,12 @@ export async function getAggregatedProducts(
         continue;
       }
 
-      const isCOD = order.displayFinancialStatus === "PENDING";
+      const gateways = order.paymentGatewayNames || [];
+      const isCOD = gateways.some(g => {
+        const lower = g.toLowerCase();
+        return lower.includes("cod") || lower.includes("contrassegno") || lower.includes("cash on delivery") || lower.includes("pagamento alla consegna");
+      }) || (order.displayFinancialStatus === "PENDING" && gateways.length === 0); // fallback in case of no gateways but pending
+
       
       // Controlla se l'ordine ha il tag "ACCETTATO" (case-insensitive)
       const orderTags = order.tags || [];
