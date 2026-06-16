@@ -17,7 +17,7 @@ api_version = "2026-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders,read_products,write_products"
+scopes = "read_orders,read_products,write_products,write_inventory"
 
 [auth]
 redirect_urls = [ "https://conteggio-prodotti.vercel.app/auth/callback", "https://conteggio-prodotti.vercel.app/api/auth/callback" ]

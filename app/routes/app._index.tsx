@@ -141,9 +141,61 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         displayName,
       });
 
-      // Aggiorna Shopify: togli la spunta "Continua a vendere quando esaurito"
+      // Aggiorna Shopify: togli la spunta "Continua a vendere" e azzera giacenza
       const { admin } = await authenticate.admin(request);
       try {
+        // 1. Trova Inventory Item e Location
+        const resQuery = await admin.graphql(
+          `query getVariantData($id: ID!) {
+            productVariant(id: $id) {
+              inventoryItem {
+                id
+                inventoryLevels(first: 1) {
+                  edges {
+                    node {
+                      location {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }`,
+          { variables: { id: variantId } }
+        );
+        const queryData = await resQuery.json();
+        const inventoryItemId = queryData.data?.productVariant?.inventoryItem?.id;
+        const locationId = queryData.data?.productVariant?.inventoryItem?.inventoryLevels?.edges?.[0]?.node?.location?.id;
+
+        // 2. Azzera le scorte
+        if (inventoryItemId && locationId) {
+          await admin.graphql(
+            `mutation setInventory($input: InventorySetOnHandQuantitiesInput!) {
+              inventorySetOnHandQuantities(input: $input) {
+                userErrors {
+                  message
+                }
+              }
+            }`,
+            {
+              variables: {
+                input: {
+                  reason: "correction",
+                  setQuantities: [
+                    {
+                      inventoryItemId,
+                      locationId,
+                      quantity: 0,
+                    },
+                  ],
+                },
+              },
+            }
+          );
+        }
+
+        // 3. Togli la spunta (imposta policy a DENY)
         await admin.graphql(
           `mutation updateVariant($input: ProductVariantInput!) {
             productVariantUpdate(input: $input) {
@@ -162,7 +214,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }
         );
       } catch (err) {
-        console.error("Failed to update inventory policy on Shopify:", err);
+        console.error("Failed to update inventory on Shopify:", err);
         // Non blocchiamo l'azione locale se Shopify fallisce (es. permessi mancanti)
       }
 
