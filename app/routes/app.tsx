@@ -24,6 +24,9 @@ export default function App() {
         <Link to="/app" rel="home">
           Gestione Ordini
         </Link>
+        <Link to="/app/reports">
+          Report Fatturato
+        </Link>
       </NavMenu>
       <Outlet />
     </AppProvider>
