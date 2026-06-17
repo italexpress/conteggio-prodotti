@@ -12,7 +12,7 @@ import {
   Banner,
 } from "@shopify/polaris";
 import { CalendarIcon } from "@shopify/polaris-icons";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useFetcher } from "@remix-run/react";
 import type { AggregatedProduct } from "../services/orders.server";
 
@@ -21,12 +21,14 @@ interface IncomingProductFormProps {
 }
 
 export function IncomingProductForm({ products }: IncomingProductFormProps) {
-  const fetcher = useFetcher();
-  const isSubmitting = fetcher.state === "submitting";
+  const submitFetcher = useFetcher();
+  const variantsFetcher = useFetcher();
+  const isSubmitting = submitFetcher.state === "submitting";
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const [selectedVariantId, setSelectedVariantId] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  
   const [datePopoverActive, setDatePopoverActive] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [{ month, year }, setDate] = useState({
@@ -34,49 +36,76 @@ export function IncomingProductForm({ products }: IncomingProductFormProps) {
     year: new Date().getFullYear(),
   });
 
-  // Opzioni per il select prodotto
-  const productOptions = useMemo(() => {
-    const options = products.map((p) => ({
-      label: `${p.displayName} (servono: ${p.totalQuantity})`,
-      value: p.variantId,
+  // Trova tutti i prodotti unici tra quelli che sono richiesti negli ordini aperti
+  const uniqueProducts = useMemo(() => {
+    const map = new Map<string, string>();
+    products.forEach(p => {
+      if (!map.has(p.productId)) {
+        map.set(p.productId, p.productTitle);
+      }
+    });
+    
+    const options = Array.from(map.entries()).map(([id, title]) => ({
+      label: title,
+      value: id,
     }));
+    
+    // Ordiniamo alfabeticamente per facilitare la ricerca
+    options.sort((a, b) => a.label.localeCompare(b.label));
+    
     return [{ label: "Seleziona un prodotto...", value: "" }, ...options];
   }, [products]);
 
-  // Trova il prodotto selezionato
-  const selectedProduct = useMemo(
-    () => products.find((p) => p.variantId === selectedVariantId),
-    [products, selectedVariantId]
-  );
+  // Carica le varianti (taglie) quando si seleziona un prodotto
+  useEffect(() => {
+    if (selectedProductId) {
+      variantsFetcher.load(`/app/api/product-variants?productId=${encodeURIComponent(selectedProductId)}`);
+      setQuantities({}); // reset quantities
+    }
+  }, [selectedProductId]);
+
+  const fetchedData = variantsFetcher.data as any;
+  const variants = fetchedData?.variants || [];
+  const isLoadingVariants = variantsFetcher.state === "loading";
+
+  const handleQuantityChange = useCallback((variantId: string, value: string) => {
+    setQuantities(prev => ({
+      ...prev,
+      [variantId]: value,
+    }));
+  }, []);
 
   const handleSubmit = useCallback(() => {
-    if (!selectedProduct || !quantity || parseInt(quantity) <= 0) return;
+    const itemsToSubmit = variants
+      .map((v: any) => ({
+        productId: selectedProductId,
+        variantId: v.id,
+        productTitle: fetchedData.productTitle,
+        variantTitle: v.title,
+        displayName: v.displayName,
+        quantity: parseInt(quantities[v.id] || "0", 10),
+        expectedArrivalDate: selectedDate ? selectedDate.toISOString().split("T")[0] : "",
+      }))
+      .filter((item: any) => item.quantity > 0);
 
-    fetcher.submit(
+    if (itemsToSubmit.length === 0) return;
+
+    submitFetcher.submit(
       {
-        intent: "addIncoming",
-        productId: selectedProduct.productId,
-        variantId: selectedProduct.variantId,
-        productTitle: selectedProduct.productTitle,
-        variantTitle: selectedProduct.variantTitle,
-        displayName: selectedProduct.displayName,
-        quantity,
-        expectedArrivalDate: selectedDate
-          ? selectedDate.toISOString().split("T")[0]
-          : "",
+        intent: "addIncomingBatch",
+        batchData: JSON.stringify(itemsToSubmit),
       },
       { method: "post" }
     );
 
     // Reset form
-    setSelectedVariantId("");
-    setQuantity("");
+    setSelectedProductId("");
+    setQuantities({});
     setSelectedDate(null);
-
-    // Mostra messaggio di successo temporaneo
+    
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
-  }, [selectedProduct, quantity, selectedDate, fetcher]);
+  }, [variants, quantities, selectedProductId, fetchedData, selectedDate, submitFetcher]);
 
   const handleMonthChange = useCallback(
     (month: number, year: number) => setDate({ month, year }),
@@ -99,37 +128,72 @@ export function IncomingProductForm({ products }: IncomingProductFormProps) {
       })
     : "";
 
+  const hasAnyQuantity = Object.values(quantities).some(q => parseInt(q || "0", 10) > 0);
+
   return (
     <BlockStack gap="400">
       <Text variant="headingSm" as="h3">
-        ➕ Registra nuova merce in arrivo
+        ➕ Registra Ordine Fornitore
       </Text>
 
       <Text as="p" tone="subdued">
-        Registra i prodotti già ordinati ai fornitori che stanno arrivando.
+        Seleziona un modello tra quelli che hanno scorte mancanti negli ordini, e inserisci le quantità ordinate per ciascuna taglia/variante.
       </Text>
 
       {showSuccess && (
         <Banner tone="success" onDismiss={() => setShowSuccess(false)}>
-          <p>Merce registrata con successo! ✅</p>
+          <p>Ordine fornitore registrato con successo! ✅</p>
         </Banner>
       )}
 
       <Select
-        label="Prodotto"
-        options={productOptions}
-        value={selectedVariantId}
-        onChange={setSelectedVariantId}
+        label="Modello Prodotto"
+        options={uniqueProducts}
+        value={selectedProductId}
+        onChange={setSelectedProductId}
       />
 
-      <TextField
-        label="Quantità in arrivo"
-        type="number"
-        value={quantity}
-        onChange={setQuantity}
-        min={1}
-        autoComplete="off"
-      />
+      {isLoadingVariants && <Text as="p" tone="subdued">Caricamento taglie in corso...</Text>}
+
+      {!isLoadingVariants && variants.length > 0 && selectedProductId && (
+        <Card background="bg-surface-secondary">
+          <BlockStack gap="300">
+            <Text variant="headingSm" as="h4">Inserisci quantità in arrivo</Text>
+            <div style={{ display: "grid", gap: "10px" }}>
+              {variants.map((v: any) => {
+                // Calcoliamo se questa specifica taglia è tra quelle "mancanti" per dare un aiuto visivo
+                const neededProduct = products.find(p => p.variantId === v.id);
+                const neededAmount = neededProduct ? neededProduct.totalQuantity : 0;
+                
+                return (
+                  <InlineStack key={v.id} align="space-between" blockAlign="center">
+                    <BlockStack gap="0">
+                      <Text as="span" fontWeight="bold">{v.title}</Text>
+                      {neededAmount > 0 && (
+                        <Text as="span" tone="critical" variant="bodySm">
+                          Ne servono: {neededAmount}
+                        </Text>
+                      )}
+                    </BlockStack>
+                    <div style={{ maxWidth: 100 }}>
+                      <TextField
+                        label="quantità"
+                        labelHidden
+                        type="number"
+                        min={0}
+                        value={quantities[v.id] || ""}
+                        onChange={(val) => handleQuantityChange(v.id, val)}
+                        autoComplete="off"
+                        placeholder="0"
+                      />
+                    </div>
+                  </InlineStack>
+                );
+              })}
+            </div>
+          </BlockStack>
+        </Card>
+      )}
 
       <Popover
         active={datePopoverActive}
@@ -164,9 +228,9 @@ export function IncomingProductForm({ products }: IncomingProductFormProps) {
           variant="primary"
           onClick={handleSubmit}
           loading={isSubmitting}
-          disabled={!selectedVariantId || !quantity || parseInt(quantity) <= 0}
+          disabled={!selectedProductId || !hasAnyQuantity}
         >
-          ➕ Aggiungi merce
+          ➕ Salva Ordine
         </Button>
       </InlineStack>
     </BlockStack>

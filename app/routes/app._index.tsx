@@ -118,6 +118,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return json({ success: true });
     }
 
+    case "addIncomingBatch": {
+      const batchData = formData.get("batchData") as string;
+      if (!batchData) {
+        return json({ error: "Dati batch mancanti" }, { status: 400 });
+      }
+
+      const items = JSON.parse(batchData);
+      
+      for (const item of items) {
+        if (!item.productId || !item.variantId || !item.quantity || item.quantity <= 0) continue;
+        await addIncomingProduct({
+          shop,
+          productId: item.productId,
+          variantId: item.variantId,
+          productTitle: item.productTitle,
+          variantTitle: item.variantTitle,
+          displayName: item.displayName,
+          quantity: item.quantity,
+          expectedArrivalDate: item.expectedArrivalDate || undefined,
+        });
+      }
+
+      return json({ success: true });
+    }
+
+
     case "deleteIncoming": {
       const deleteId = formData.get("deleteId") as string;
       if (!deleteId) {
