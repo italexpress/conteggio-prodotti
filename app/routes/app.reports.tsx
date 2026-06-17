@@ -9,8 +9,10 @@ import {
   Text,
   InlineStack,
   Icon,
-  Button
+  Button,
+  TextField,
 } from "@shopify/polaris";
+import { useState } from "react";
 import { CashDollarIcon, CalendarIcon, OrderIcon, RefreshIcon } from "@shopify/polaris-icons";
 
 import { authenticate } from "../shopify.server";
@@ -85,11 +87,62 @@ export default function ReportsIndex() {
   const navigation = useNavigation();
   const isRefreshing = navigation.state === "loading";
 
+  const [pin, setPin] = useState("");
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [error, setError] = useState(false);
+
   const formattedLastUpdated = new Date(lastUpdated).toLocaleTimeString("it-IT", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
+
+  if (!isUnlocked) {
+    return (
+      <Page title="Report Fatturato (Protetto)">
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400" align="center">
+                <Text variant="headingMd" as="h2" alignment="center">
+                  Inserisci il codice PIN per accedere ai dati sul fatturato
+                </Text>
+                <div style={{ maxWidth: 200, margin: "0 auto" }}>
+                  <TextField
+                    label="Codice PIN"
+                    labelHidden
+                    type="password"
+                    value={pin}
+                    onChange={(val) => {
+                      setPin(val);
+                      setError(false);
+                    }}
+                    autoComplete="off"
+                    error={error ? "PIN errato" : undefined}
+                  />
+                </div>
+                <div style={{ margin: "0 auto" }}>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      if (pin === "1010") {
+                        setIsUnlocked(true);
+                      } else {
+                        setError(true);
+                        setPin("");
+                      }
+                    }}
+                  >
+                    Sblocca Report
+                  </Button>
+                </div>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
 
   return (
     <Page
