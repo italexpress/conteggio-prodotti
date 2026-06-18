@@ -25,7 +25,7 @@ export default function App() {
           Gestione Ordini
         </Link>
         <Link to="/app/reports">
-          Report Fatturato
+          Profit Dashboard
         </Link>
       </NavMenu>
       <Outlet />

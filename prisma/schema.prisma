@@ -59,3 +59,49 @@ model OutOfStockProduct {
 
   @@unique([shop, variantId])
 }
+
+model DashboardSettings {
+  id                    String  @id @default(cuid())
+  shop                  String  @unique
+
+  // Costi spedizione
+  shippingCostOutbound  Float   @default(3.50)   // Spedizione andata
+  shippingCostReturn    Float   @default(3.50)   // Spedizione reso ritorno
+  codManagementFee      Float   @default(1.20)   // Gestione contrassegno
+
+  // Reso rimborso
+  returnRefundRevenue   Float   @default(9.00)   // Quanto paga il cliente per reso
+  returnRefundCost      Float   @default(5.00)   // Quanto costa all'azienda il reso
+
+  // Reso cambio
+  returnExchangeRevenue Float   @default(11.00)  // Quanto paga il cliente per cambio
+  returnExchangeCost    Float   @default(7.00)   // Quanto costa all'azienda il cambio
+
+  // Fee pagamento
+  shopifyFeePercent     Float   @default(1.9)    // Fee Shopify %
+  shopifyFeeFixed       Float   @default(0.25)   // Fee Shopify fisso €
+  paypalFeePercent      Float   @default(3.4)    // Fee PayPal %
+  paypalFeeFixed        Float   @default(0.35)   // Fee PayPal fisso €
+
+  // IVA
+  vatPercent            Float   @default(22.0)
+
+  // Costo spedizione standard per ordine
+  defaultShippingCost   Float   @default(5.00)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model FixedCost {
+  id          String   @id @default(cuid())
+  shop        String
+  name        String          // es. "Dipendente Mario", "Affitto", "Shopify"
+  category    String          // es. "employee", "software", "rent", "accountant", "utilities", "other"
+  monthlyCost Float           // Costo mensile
+  notes       String?         // Note aggiuntive
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([shop])
+}
