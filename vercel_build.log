@@ -1,0 +1,76 @@
+
+> build
+> remix vite:build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1473 modules transformed.
+Generated an empty chunk: "app.api.product-variants".
+Generated an empty chunk: "auth._".
+Generated an empty chunk: "webhooks.app.scopes_update".
+Generated an empty chunk: "webhooks.app.uninstalled".
+Generated an empty chunk: "webhooks.orders.cancelled".
+Generated an empty chunk: "webhooks.orders.create".
+Generated an empty chunk: "webhooks.orders.fulfilled".
+Generated an empty chunk: "webhooks.orders.updated".
+rendering chunks...
+[esbuild css minify]
+▲ [WARNING] Expected "(" but found "print" [css-syntax-error]
+
+    <stdin>:8293:35:
+      8293 │ @media (--p-breakpoints-md-up) and print{
+           │                                    ~~~~~
+           ╵                                    (
+
+
+computing gzip size...
+build/client/.vite/manifest.json                              8.07 kB │ gzip:  1.10 kB
+build/client/assets/route-Xpdx9QZl.css                        0.76 kB │ gzip:  0.35 kB
+build/client/assets/styles-CV7GIAUv.css                     443.54 kB │ gzip: 52.24 kB
+build/client/assets/app.api.product-variants-l0sNRNKZ.js      0.00 kB │ gzip:  0.02 kB
+build/client/assets/auth._-l0sNRNKZ.js                        0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.app.scopes_update-l0sNRNKZ.js    0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.app.uninstalled-l0sNRNKZ.js      0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.orders.cancelled-l0sNRNKZ.js     0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.orders.create-l0sNRNKZ.js        0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.orders.fulfilled-l0sNRNKZ.js     0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.orders.updated-l0sNRNKZ.js       0.00 kB │ gzip:  0.02 kB
+build/client/assets/context-DI-1A5_I.js                       0.13 kB │ gzip:  0.12 kB
+build/client/assets/XIcon.svg-B0urOjNO.js                     0.39 kB │ gzip:  0.25 kB
+build/client/assets/route-CsEwmkE7.js                         0.82 kB │ gzip:  0.50 kB
+build/client/assets/FormLayout-D1eWmhnA.js                    0.96 kB │ gzip:  0.53 kB
+build/client/assets/RefreshIcon.svg-BGCtbUSN.js               1.42 kB │ gzip:  0.64 kB
+build/client/assets/route-BcNDpZVi.js                         1.48 kB │ gzip:  0.60 kB
+build/client/assets/root-mCvuBQHg.js                          1.50 kB │ gzip:  0.86 kB
+build/client/assets/Layout-D-00tagg.js                        1.60 kB │ gzip:  0.58 kB
+build/client/assets/entry.client-BWsM2u4R.js                  3.83 kB │ gzip:  1.45 kB
+build/client/assets/app.reports.settings-Q_rGx47k.js          5.48 kB │ gzip:  1.77 kB
+build/client/assets/styles-CmuhSl0x.js                        5.95 kB │ gzip:  2.46 kB
+build/client/assets/app.reports-CdQKPtoh.js                   7.93 kB │ gzip:  3.08 kB
+build/client/assets/Banner-rtSRU8zF.js                        8.05 kB │ gzip:  2.62 kB
+build/client/assets/app-DXWt8EXp.js                          12.70 kB │ gzip:  4.00 kB
+build/client/assets/app.reports.costs-QsI7gb4c.js            20.15 kB │ gzip:  6.46 kB
+build/client/assets/Select-DIErb2u9.js                       27.49 kB │ gzip:  9.33 kB
+build/client/assets/Page-DTOXQ7m3.js                         88.50 kB │ gzip: 27.15 kB
+build/client/assets/app._index-D6620a83.js                  112.91 kB │ gzip: 32.77 kB
+build/client/assets/context-C3nLRUa0.js                     151.79 kB │ gzip: 17.07 kB
+build/client/assets/components-DyjAGoyn.js                  258.58 kB │ gzip: 83.44 kB
+✓ built in 3.07s
+vite v6.4.3 building SSR bundle for production...
+transforming...
+✓ 38 modules transformed.
+[esbuild css minify]
+▲ [WARNING] Expected "(" but found "print" [css-syntax-error]
+
+    <stdin>:8293:35:
+      8293 │ @media (--p-breakpoints-md-up) and print{
+           │                                    ~~~~~
+           ╵                                    (
+
+
+rendering chunks...
+build/server/nodejs-eyJydW50aW1lIjoibm9kZWpzIn0/.vite/manifest.json                 0.58 kB
+build/server/nodejs-eyJydW50aW1lIjoibm9kZWpzIn0/assets/server-build-Xpdx9QZl.css    0.76 kB
+build/server/nodejs-eyJydW50aW1lIjoibm9kZWpzIn0/assets/styles-CV7GIAUv.css        443.54 kB
+build/server/nodejs-eyJydW50aW1lIjoibm9kZWpzIn0/index.js                          132.35 kB
+✓ built in 349ms

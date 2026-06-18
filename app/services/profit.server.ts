@@ -100,10 +100,10 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
 
   while (hasNextPage) {
     try {
-      const response = await admin.graphql(ORDERS_PROFIT_QUERY, {
+      const response: any = await admin.graphql(ORDERS_PROFIT_QUERY, {
         variables: { query: queryStr, cursor },
       });
-      const json = await response.json();
+      const json: any = await response.json();
 
       if (json.errors) {
         console.error("GraphQL Errors in Profit:", json.errors);

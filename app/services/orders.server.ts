@@ -203,7 +203,7 @@ export async function getAggregatedProducts(
       }
 
       const gateways = order.paymentGatewayNames || [];
-      const isCOD = gateways.some(g => {
+      const isCOD = gateways.some((g: string) => {
         const lower = g.toLowerCase();
         return lower.includes("cod") || lower.includes("contrassegno") || lower.includes("cash on delivery") || lower.includes("pagamento alla consegna");
       }) || (order.displayFinancialStatus === "PENDING" && gateways.length === 0); // fallback in case of no gateways but pending
@@ -211,9 +211,7 @@ export async function getAggregatedProducts(
       
       // Controlla se l'ordine ha il tag "ACCETTATO" (case-insensitive)
       const orderTags = order.tags || [];
-      const hasAcceptedTag = orderTags.some(
-        (tag) => tag.toUpperCase() === "ACCETTATO"
-      );
+      const hasAcceptedTag = orderTags.some((tag: string) => tag.toUpperCase() === "ACCETTATO");
       
       const isCodAccepted = isCOD && hasAcceptedTag;
 
@@ -225,15 +223,15 @@ export async function getAggregatedProducts(
       if (isCOD && !hasAcceptedTag) {
         const customerName = "Cliente"; // Rimosso per limiti permessi Shopify Protected Data
         const items = order.lineItems.edges
-          .filter((e) => e.node.currentQuantity > 0)
-          .map((e) => ({
+          .filter((e: any) => e.node.currentQuantity > 0)
+          .map((e: any) => ({
             title: e.node.variantTitle
               ? `${e.node.title} - ${e.node.variantTitle}`
               : e.node.title,
             quantity: e.node.currentQuantity,
           }));
 
-        const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+        const itemCount = items.reduce((sum: number, i: any) => sum + i.quantity, 0);
 
         unconfirmedCodOrders.push({
           id: order.id,

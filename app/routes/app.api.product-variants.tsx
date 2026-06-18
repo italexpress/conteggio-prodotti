@@ -41,7 +41,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     );
 
-    const data = await response.json();
+    const data: any = await response.json();
 
     if (data.errors) {
       console.error("GraphQL errors:", data.errors);

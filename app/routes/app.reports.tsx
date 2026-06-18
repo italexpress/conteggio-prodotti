@@ -19,7 +19,6 @@ import {
   OrderIcon, 
   RefreshIcon, 
   AlertCircleIcon, 
-  ChartUpIcon, 
   SettingsIcon,
   BankIcon,
 } from "@shopify/polaris-icons";
@@ -203,8 +202,8 @@ export default function ProfitDashboard() {
             <StatCard
               title="Profitto Netto Oggi"
               value={formatCurrency(stats.today.netProfit)}
-              subtitle={<Badge tone={stats.today.netProfit >= 0 ? "success" : "critical"}>Margine: {stats.today.margin.toFixed(1)}%</Badge>}
-              icon={ChartUpIcon}
+              subtitle={<Badge tone={stats.today.netProfit >= 0 ? "success" : "critical"}>{"Margine: " + stats.today.margin.toFixed(1) + "%"}</Badge>}
+              icon={CashDollarIcon}
               tone="success"
             />
           </Layout.Section>
@@ -212,8 +211,8 @@ export default function ProfitDashboard() {
             <StatCard
               title="Profitto Netto Mese"
               value={formatCurrency(stats.thisMonth.netProfit)}
-              subtitle={<Badge tone={stats.thisMonth.netProfit >= 0 ? "success" : "critical"}>Fatturato: {formatCurrency(stats.thisMonth.revenue)}</Badge>}
-              icon={ChartUpIcon}
+              subtitle={<Badge tone={stats.thisMonth.netProfit >= 0 ? "success" : "critical"}>{"Fatturato: " + formatCurrency(stats.thisMonth.revenue)}</Badge>}
+              icon={CashDollarIcon}
               tone="magic"
             />
           </Layout.Section>
@@ -259,7 +258,7 @@ export default function ProfitDashboard() {
               title="Profitto Medio per Ordine"
               value={formatCurrency(stats.financials.averageOrderProfit)}
               subtitle={`AOV: ${formatCurrency(stats.financials.averageOrderValue)}`}
-              icon={ChartUpIcon}
+              icon={CashDollarIcon}
               tone="info"
             />
           </Layout.Section>
@@ -268,7 +267,7 @@ export default function ProfitDashboard() {
               title="Margine di Profitto Globale"
               value={`${stats.thisYear.margin.toFixed(1)}%`}
               subtitle={`Profitto YTD: ${formatCurrency(stats.thisYear.netProfit)}`}
-              icon={ChartUpIcon}
+              icon={CashDollarIcon}
               tone="magic"
             />
           </Layout.Section>
