@@ -107,6 +107,15 @@ export interface LossStats {
   totalMoneyLost: number;
 }
 
+export interface ChartDataPoint {
+  name: string;
+  revenue: number;
+  netProfit: number;
+  logisticsMargin: number;
+  returnsCount: number;
+  returnedPackagesCount: number;
+}
+
 export interface ProfitStats {
   today: PeriodStats;
   thisMonth: PeriodStats;
@@ -119,6 +128,10 @@ export interface ProfitStats {
     roas: number;
     cpa: number;
     netProfitAfterFixedCosts: number;
+  };
+  charts: {
+    daily: ChartDataPoint[];
+    monthly: ChartDataPoint[];
   };
 }
 
@@ -222,7 +235,18 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
     },
     losses: { returnedPackagesCount: 0, returnedPackagesCost: 0, returnsCost: 0, totalMoneyLost: 0 },
     financials: { avgOrderProfit: 0, avgOrderValue: 0, roas: 0, cpa: 0, netProfitAfterFixedCosts: 0 },
+    charts: { daily: [], monthly: [] },
   };
+
+  const dailyMap = new Map<string, ChartDataPoint>();
+  const monthlyMap = new Map<string, ChartDataPoint>();
+
+  const getDayKey = (d: Date) => d.toISOString().split("T")[0];
+  const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+  const initDataPoint = (name: string): ChartDataPoint => ({
+    name, revenue: 0, netProfit: 0, logisticsMargin: 0, returnsCount: 0, returnedPackagesCount: 0
+  });
 
   let totalValidOrders = 0;
   let totalValidRevenue = 0;
@@ -266,6 +290,15 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
 
         totalOrdersCount++;
 
+        const dayKey = getDayKey(orderDate);
+        const monthKey = getMonthKey(orderDate);
+
+        if (!dailyMap.has(dayKey)) dailyMap.set(dayKey, initDataPoint(dayKey));
+        if (!monthlyMap.has(monthKey)) monthlyMap.set(monthKey, initDataPoint(monthKey));
+
+        const dpDaily = dailyMap.get(dayKey)!;
+        const dpMonthly = monthlyMap.get(monthKey)!;
+
         // ─── EXCEPTION: RITORNO_MERCE ──────────────────────────────────────
         if (orderType === "ritorno_merce") {
           // Loss = outbound shipping + COD cost + return shipping (all IVA-inclusive from settings)
@@ -282,6 +315,13 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
           stats.thisYear.netProfit -= loss;
           if (isThisMonth) stats.thisMonth.netProfit -= loss;
           if (isToday) stats.today.netProfit -= loss;
+          
+          dpDaily.netProfit -= loss;
+          dpDaily.returnsCount++;
+          dpDaily.returnedPackagesCount++;
+          dpMonthly.netProfit -= loss;
+          dpMonthly.returnsCount++;
+          dpMonthly.returnedPackagesCount++;
           continue;
         }
 
@@ -298,6 +338,11 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
           stats.thisYear.netProfit -= cost;
           if (isThisMonth) stats.thisMonth.netProfit -= cost;
           if (isToday) stats.today.netProfit -= cost;
+
+          dpDaily.netProfit -= cost;
+          dpDaily.returnsCount++;
+          dpMonthly.netProfit -= cost;
+          dpMonthly.returnsCount++;
           continue;
         }
 
@@ -320,6 +365,11 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
           stats.thisYear.netProfit += profit;
           if (isThisMonth) stats.thisMonth.netProfit += profit;
           if (isToday) stats.today.netProfit += profit;
+
+          dpDaily.netProfit += profit;
+          dpDaily.returnsCount++;
+          dpMonthly.netProfit += profit;
+          dpMonthly.returnsCount++;
           continue;
         }
 
@@ -341,6 +391,11 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
           stats.thisYear.netProfit += profit;
           if (isThisMonth) stats.thisMonth.netProfit += profit;
           if (isToday) stats.today.netProfit += profit;
+
+          dpDaily.netProfit += profit;
+          dpDaily.returnsCount++;
+          dpMonthly.netProfit += profit;
+          dpMonthly.returnsCount++;
           continue;
         }
 
@@ -369,6 +424,11 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
           stats.thisYear.netProfit += netImpact;
           if (isThisMonth) stats.thisMonth.netProfit += netImpact;
           if (isToday) stats.today.netProfit += netImpact;
+
+          dpDaily.netProfit += netImpact;
+          dpDaily.returnsCount++;
+          dpMonthly.netProfit += netImpact;
+          dpMonthly.returnsCount++;
           continue;
         }
 
@@ -412,6 +472,14 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
         addToPeriod(stats.thisYear);
         if (isThisMonth) addToPeriod(stats.thisMonth);
         if (isToday) addToPeriod(stats.today);
+
+        dpDaily.revenue += amount;
+        dpDaily.netProfit += orderProfit;
+        dpDaily.logisticsMargin += logistics.margin;
+
+        dpMonthly.revenue += amount;
+        dpMonthly.netProfit += orderProfit;
+        dpMonthly.logisticsMargin += logistics.margin;
       }
 
       hasNextPage = orders.pageInfo.hasNextPage;
@@ -436,6 +504,14 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
   stats.financials.avgOrderValue = totalValidOrders > 0 ? totalValidRevenue / totalValidOrders : 0;
   stats.financials.avgOrderProfit = totalValidOrders > 0 ? totalValidProfit / totalValidOrders : 0;
   stats.financials.netProfitAfterFixedCosts = stats.thisMonth.netProfit - monthlyFixedCosts;
+
+  // Charts mapping
+  const currentMonthPrefix = getMonthKey(now);
+  stats.charts.daily = Array.from(dailyMap.values())
+    .filter(dp => dp.name.startsWith(currentMonthPrefix))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  stats.charts.monthly = Array.from(monthlyMap.values())
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return stats;
 }

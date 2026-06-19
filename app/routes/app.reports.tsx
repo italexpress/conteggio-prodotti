@@ -9,6 +9,9 @@ import {
   CashDollarIcon, OrderIcon, RefreshIcon, AlertCircleIcon,
   SettingsIcon, BankIcon, DeliveryIcon,
 } from "@shopify/polaris-icons";
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
+} from "recharts";
 
 import { authenticate } from "../shopify.server";
 import { getProfitStats } from "../services/profit.server";
@@ -178,6 +181,93 @@ export default function ProfitDashboard() {
           </Layout.Section>
           <Layout.Section variant="oneThird">
             <StatCard title="Utile Netto Mese (dopo Costi Fissi)" value={fmt(stats.financials.netProfitAfterFixedCosts)} subtitle="Profitto mese - tutti i costi fissi" tone={stats.financials.netProfitAfterFixedCosts >= 0 ? "success" : "critical"} />
+          </Layout.Section>
+        </Layout>
+
+        {/* ─── GRAFICI ─── */}
+        <Text variant="headingLg" as="h2">📈 Grafici Trend</Text>
+        <Layout>
+          <Layout.Section variant="oneHalf">
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h3">Revenue vs Profitto (Giornaliero)</Text>
+                <div style={{ height: 300, width: "100%" }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={stats.charts.daily} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{fontSize: 12}} tickFormatter={(v) => v.substring(5)} />
+                      <YAxis tick={{fontSize: 12}} tickFormatter={(v) => "€"+v} />
+                      <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, ""]} />
+                      <Legend />
+                      <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#3b82f6" fill="#bfdbfe" />
+                      <Area type="monotone" dataKey="netProfit" name="Profitto" stroke="#22c55e" fill="#bbf7d0" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+          
+          <Layout.Section variant="oneHalf">
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h3">Revenue vs Profitto (Mensile)</Text>
+                <div style={{ height: 300, width: "100%" }}>
+                  <ResponsiveContainer>
+                    <BarChart data={stats.charts.monthly} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{fontSize: 12}} />
+                      <YAxis tick={{fontSize: 12}} tickFormatter={(v) => "€"+v} />
+                      <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, ""]} />
+                      <Legend />
+                      <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="netProfit" name="Profitto" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+
+          <Layout.Section variant="oneHalf">
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h3">Margine Logistico (Giornaliero)</Text>
+                <div style={{ height: 300, width: "100%" }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={stats.charts.daily} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{fontSize: 12}} tickFormatter={(v) => v.substring(5)} />
+                      <YAxis tick={{fontSize: 12}} tickFormatter={(v) => "€"+v} />
+                      <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, ""]} />
+                      <Legend />
+                      <Area type="monotone" dataKey="logisticsMargin" name="Logistics Margin" stroke="#8b5cf6" fill="#ddd6fe" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+
+          <Layout.Section variant="oneHalf">
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h3">Andamento Resi (Mensile)</Text>
+                <div style={{ height: 300, width: "100%" }}>
+                  <ResponsiveContainer>
+                    <LineChart data={stats.charts.monthly} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{fontSize: 12}} />
+                      <YAxis tick={{fontSize: 12}} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="returnsCount" name="Totale Resi" stroke="#f59e0b" strokeWidth={2} />
+                      <Line type="monotone" dataKey="returnedPackagesCount" name="Ritorno Merce (COD)" stroke="#ef4444" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </BlockStack>
+            </Card>
           </Layout.Section>
         </Layout>
 
