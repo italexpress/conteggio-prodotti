@@ -15,10 +15,6 @@ const ORDERS_QUERY = `
           displayFinancialStatus
           tags
           paymentGatewayNames
-          customer {
-            firstName
-            lastName
-          }
           totalPriceSet {
             shopMoney { amount }
           }
@@ -230,7 +226,12 @@ export async function getAdvancedAnalysis(
         variables: { query: queryStr, cursor, first: 50 },
       });
       const json: any = await response.json();
-      if (json.errors || !json.data?.orders) break;
+      
+      if (json.errors) {
+        console.error("GraphQL errors:", JSON.stringify(json.errors, null, 2));
+      }
+      
+      if (!json.data?.orders) break;
 
       const { orders: rawOrders } = json.data;
 
@@ -246,7 +247,7 @@ export async function getAdvancedAnalysis(
       const orderType = detectOrderType(tags);
       const hasFreeShipping = shippingCharged === 0;
 
-      const customerName = order.customer ? `${order.customer.firstName || ""} ${order.customer.lastName || ""}`.trim() : "Guest";
+      const customerName = "Cliente"; // Richiede read_customers scope per i dati reali
 
       let cogs = 0;
       const lineItems: LineItemDetail[] = [];
