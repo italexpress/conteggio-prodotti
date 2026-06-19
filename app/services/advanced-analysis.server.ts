@@ -25,7 +25,7 @@ const ORDERS_QUERY = `
           totalShippingPriceSet {
             shopMoney { amount }
           }
-          lineItems(first: 50) {
+          lineItems(first: 10) {
             edges {
               node {
                 quantity
@@ -225,13 +225,14 @@ export async function getAdvancedAnalysis(
   let cursor: string | null = null;
 
   while (hasNextPage) {
-    const response: any = await admin.graphql(ORDERS_QUERY, {
-      variables: { query: queryStr, cursor, first: 250 },
-    });
-    const json: any = await response.json();
-    if (json.errors || !json.data?.orders) break;
+    try {
+      const response: any = await admin.graphql(ORDERS_QUERY, {
+        variables: { query: queryStr, cursor, first: 50 },
+      });
+      const json: any = await response.json();
+      if (json.errors || !json.data?.orders) break;
 
-    const { orders: rawOrders } = json.data;
+      const { orders: rawOrders } = json.data;
 
     for (const edge of rawOrders.edges) {
       const order = edge.node;
@@ -372,6 +373,10 @@ export async function getAdvancedAnalysis(
 
     hasNextPage = rawOrders.pageInfo.hasNextPage;
     cursor = rawOrders.pageInfo.endCursor;
+    } catch (e) {
+      console.error("Error fetching advanced analysis data:", e);
+      break;
+    }
   }
 
   // ─── AGGREGATIONS ───
