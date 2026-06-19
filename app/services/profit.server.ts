@@ -82,7 +82,9 @@ interface PeriodStats {
   netProfit: number;
   margin: number;
   adsSpend: number;
-  logisticsMargin: number;
+  logisticsMargin: number; // Net
+  positiveLogisticsMargin: number; // Only gains
+  negativeLogisticsMargin: number; // Only losses (free shipping etc)
   freeShippingCost: number;
   shippingRevenue: number;
   codRevenue: number;
@@ -222,9 +224,9 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
   const queryStr = `created_at:>=${startOfYear.toISOString().split("T")[0]}`;
 
   const stats: ProfitStats = {
-    today: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
-    thisMonth: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
-    thisYear: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
+    today: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, positiveLogisticsMargin: 0, negativeLogisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
+    thisMonth: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, positiveLogisticsMargin: 0, negativeLogisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
+    thisYear: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, positiveLogisticsMargin: 0, negativeLogisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
     returns: {
       ritornoMerce: { count: 0, cost: 0 },
       resoClienteSpedisce: { count: 0, cost: 0, avgCost: 0 },
@@ -464,6 +466,8 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
           p.orders++;
           p.netProfit += orderProfit;
           p.logisticsMargin += logistics.margin;
+          if (logistics.margin > 0) p.positiveLogisticsMargin += logistics.margin;
+          if (logistics.margin < 0) p.negativeLogisticsMargin += logistics.margin;
           p.freeShippingCost += logistics.freeShipCost;
           p.shippingRevenue += logistics.shippingRev;
           p.codRevenue += logistics.codRev;
