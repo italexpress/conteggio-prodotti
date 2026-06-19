@@ -82,6 +82,7 @@ export default function ProfitDashboard() {
       subtitle={`Ultimo aggiornamento: ${time}`}
       primaryAction={<Button icon={RefreshIcon} loading={isRefreshing} onClick={() => window.location.reload()}>Aggiorna</Button>}
       secondaryActions={[
+        { content: "Analisi Avanzata", url: "/app/reports/advanced", variant: "primary" },
         { content: "Dettaglio Ordini", icon: OrderIcon, url: "/app/reports/orders" },
         { content: "Impostazioni", icon: SettingsIcon, url: "/app/reports/settings" },
         { content: "Costi Fissi", icon: BankIcon, url: "/app/reports/costs" },

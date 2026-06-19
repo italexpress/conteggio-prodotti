@@ -20,7 +20,10 @@
       "routes/_index": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/auth.$": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.api.product-variants": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/app.reports": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.api.export": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.reports.advanced.orders._index": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.reports.advanced.orders.$id": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.reports.advanced._index": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.reports.settings": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.reports.orders": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.reports.costs": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -130,11 +133,47 @@
           "runtime": "nodejs"
         }
       },
+      "routes/app.api.export": {
+        "id": "routes/app.api.export",
+        "parentId": "routes/app",
+        "file": "app/routes/app.api.export.ts",
+        "path": "api/export",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
       "routes/app.reports": {
         "id": "routes/app.reports",
         "parentId": "routes/app",
         "file": "app/routes/app.reports.tsx",
         "path": "reports",
+        "config": {}
+      },
+      "routes/app.reports.advanced.orders._index": {
+        "id": "routes/app.reports.advanced.orders._index",
+        "parentId": "routes/app.reports",
+        "file": "app/routes/app.reports.advanced.orders._index.tsx",
+        "path": "advanced/orders",
+        "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.reports.advanced.orders.$id": {
+        "id": "routes/app.reports.advanced.orders.$id",
+        "parentId": "routes/app.reports",
+        "file": "app/routes/app.reports.advanced.orders.$id.tsx",
+        "path": "advanced/orders/:id",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.reports.advanced._index": {
+        "id": "routes/app.reports.advanced._index",
+        "parentId": "routes/app.reports",
+        "file": "app/routes/app.reports.advanced._index.tsx",
+        "path": "advanced",
+        "index": true,
         "config": {
           "runtime": "nodejs"
         }
@@ -144,21 +183,27 @@
         "parentId": "routes/app.reports",
         "file": "app/routes/app.reports.settings.tsx",
         "path": "settings",
-        "config": {}
+        "config": {
+          "runtime": "nodejs"
+        }
       },
       "routes/app.reports.orders": {
         "id": "routes/app.reports.orders",
         "parentId": "routes/app.reports",
         "file": "app/routes/app.reports.orders.tsx",
         "path": "orders",
-        "config": {}
+        "config": {
+          "runtime": "nodejs"
+        }
       },
       "routes/app.reports.costs": {
         "id": "routes/app.reports.costs",
         "parentId": "routes/app.reports",
         "file": "app/routes/app.reports.costs.tsx",
         "path": "costs",
-        "config": {}
+        "config": {
+          "runtime": "nodejs"
+        }
       },
       "routes/app._index": {
         "id": "routes/app._index",
@@ -258,11 +303,37 @@
         "file": "routes/app.api.product-variants.tsx",
         "path": "api/product-variants"
       },
+      "routes/app.api.export": {
+        "id": "routes/app.api.export",
+        "parentId": "routes/app",
+        "file": "routes/app.api.export.ts",
+        "path": "api/export"
+      },
       "routes/app.reports": {
         "id": "routes/app.reports",
         "parentId": "routes/app",
         "file": "routes/app.reports.tsx",
         "path": "reports"
+      },
+      "routes/app.reports.advanced.orders._index": {
+        "id": "routes/app.reports.advanced.orders._index",
+        "parentId": "routes/app.reports",
+        "file": "routes/app.reports.advanced.orders._index.tsx",
+        "path": "advanced/orders",
+        "index": true
+      },
+      "routes/app.reports.advanced.orders.$id": {
+        "id": "routes/app.reports.advanced.orders.$id",
+        "parentId": "routes/app.reports",
+        "file": "routes/app.reports.advanced.orders.$id.tsx",
+        "path": "advanced/orders/:id"
+      },
+      "routes/app.reports.advanced._index": {
+        "id": "routes/app.reports.advanced._index",
+        "parentId": "routes/app.reports",
+        "file": "routes/app.reports.advanced._index.tsx",
+        "path": "advanced",
+        "index": true
       },
       "routes/app.reports.settings": {
         "id": "routes/app.reports.settings",
