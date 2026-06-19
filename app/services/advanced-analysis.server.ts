@@ -13,6 +13,7 @@ const ORDERS_QUERY = `
           name
           createdAt
           displayFinancialStatus
+          displayFulfillmentStatus
           tags
           paymentGatewayNames
           totalPriceSet {
@@ -342,10 +343,15 @@ export async function getAdvancedAnalysis(
         continue;
       }
 
-      // Standard
+      // ─── VALIDATION ───
       const hasAcceptedTag = tags.some((t: string) => t.toUpperCase().trim() === "ACCETTATO");
       const isCOD = method === "contrassegno";
-      const isValid = status === "PAID" || status === "PARTIALLY_PAID" || (isCOD && hasAcceptedTag);
+      const isFulfilled = order.displayFulfillmentStatus === "FULFILLED";
+
+      const isValid =
+        status === "PAID" ||
+        status === "PARTIALLY_PAID" ||
+        (isCOD && (hasAcceptedTag || isFulfilled));
 
       if (!isValid) {
         orders.push({
