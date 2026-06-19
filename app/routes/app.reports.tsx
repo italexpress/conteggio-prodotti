@@ -173,6 +173,11 @@ export default function ProfitDashboard() {
       }
       secondaryActions={[
         {
+          content: "Dettaglio Ordini",
+          icon: OrderIcon,
+          url: "/app/reports/orders",
+        },
+        {
           content: "Impostazioni",
           icon: SettingsIcon,
           url: "/app/reports/settings",

@@ -22,6 +22,7 @@
       "routes/app.api.product-variants": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.reports": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.reports.settings": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.reports.orders": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.reports.costs": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app._index": "nodejs-eyJydW50aW1lIjoibm9kZWpzIn0"
     },
@@ -145,6 +146,13 @@
         "path": "settings",
         "config": {}
       },
+      "routes/app.reports.orders": {
+        "id": "routes/app.reports.orders",
+        "parentId": "routes/app.reports",
+        "file": "app/routes/app.reports.orders.tsx",
+        "path": "orders",
+        "config": {}
+      },
       "routes/app.reports.costs": {
         "id": "routes/app.reports.costs",
         "parentId": "routes/app.reports",
@@ -261,6 +269,12 @@
         "parentId": "routes/app.reports",
         "file": "routes/app.reports.settings.tsx",
         "path": "settings"
+      },
+      "routes/app.reports.orders": {
+        "id": "routes/app.reports.orders",
+        "parentId": "routes/app.reports",
+        "file": "routes/app.reports.orders.tsx",
+        "path": "orders"
       },
       "routes/app.reports.costs": {
         "id": "routes/app.reports.costs",
