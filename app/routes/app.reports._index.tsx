@@ -128,12 +128,12 @@ export default function ProfitDashboard() {
             <StatCard title="COD Revenue" value={fmt(stats.thisYear.codRevenue)} subtitle="Fee contrassegno incassate" tone="info" />
           </Layout.Section>
           <Layout.Section variant="oneThird">
-            <StatCard title="Guadagni Spedizioni" value={fmt(stats.thisYear.positiveLogisticsMargin)} subtitle="Senza contare i costi per free shipping" tone="success" />
+            <StatCard title="Guadagni Spedizioni" value={fmt(stats.thisYear.positiveLogisticsMargin)} subtitle={`Su ${stats.thisYear.positiveLogisticsCount} ordini`} tone="success" />
           </Layout.Section>
         </Layout>
         <Layout>
           <Layout.Section variant="oneThird">
-            <StatCard title="Costi Spedizioni Gratuite" value={fmt(stats.thisYear.negativeLogisticsMargin)} subtitle="Perdite nette per spedizioni assorbite" tone="critical" />
+            <StatCard title="Costi Spedizioni Gratuite" value={fmt(stats.thisYear.negativeLogisticsMargin)} subtitle={`Su ${stats.thisYear.negativeLogisticsCount} ordini regalati`} tone="critical" />
           </Layout.Section>
           <Layout.Section variant="oneThird">
             <StatCard title="Logistics Margin Totale" value={fmt(stats.thisYear.logisticsMargin)} subtitle="Guadagni + Perdite logistica" tone={stats.thisYear.logisticsMargin >= 0 ? "success" : "critical"} />
