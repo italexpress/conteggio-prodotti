@@ -62,36 +62,39 @@ model OutOfStockProduct {
 }
 
 model DashboardSettings {
-  id                    String  @id @default(cuid())
-  shop                  String  @unique
+  id                      String  @id @default(cuid())
+  shop                    String  @unique
 
-  // Costi spedizione
-  shippingCostOutbound  Float   @default(3.50)   // Spedizione andata
-  shippingCostReturn    Float   @default(3.50)   // Spedizione reso ritorno
-  codManagementFee      Float   @default(1.20)   // Gestione contrassegno
+  // Logistics
+  shippingRevenue         Float   @default(6.50)    // Quanto paga il cliente per la spedizione
+  shippingCost            Float   @default(4.27)    // Costo reale spedizione per l'azienda (IVA inclusa)
+  codFeeCharged           Float   @default(4.90)    // Fee COD addebitata al cliente
+  codCost                 Float   @default(5.73)    // Costo reale COD per l'azienda (IVA inclusa)
+  freeShippingThreshold   Float   @default(69.00)   // Soglia spedizione gratuita
+  returnShipmentCost      Float   @default(4.27)    // Costo spedizione ritorno merce (IVA inclusa)
 
-  // Reso rimborso
-  returnRefundRevenue   Float   @default(9.00)   // Quanto paga il cliente per reso
-  returnRefundCost      Float   @default(5.00)   // Quanto costa all'azienda il reso
+  // Returns
+  resoClienteShippingCost Float   @default(4.27)    // RESO_CLIENTE_SPEDISCE: costo spedizione sostitutivo
+  resoRimborsoRevenue     Float   @default(9.00)    // RESO_RIMBORSO_RITIRO: quanto paga il cliente
+  resoRimborsoCost        Float   @default(5.00)    // RESO_RIMBORSO_RITIRO: costo reale ritiro
+  resoExchangeRevenue     Float   @default(11.00)   // RESO_EXCHANGE: quanto paga il cliente
+  resoExchangeCost        Float   @default(7.00)    // RESO_EXCHANGE: costo reale cambio
 
-  // Reso cambio
-  returnExchangeRevenue Float   @default(11.00)  // Quanto paga il cliente per cambio
-  returnExchangeCost    Float   @default(7.00)   // Quanto costa all'azienda il cambio
+  // Payment Fees
+  shopifyFeePercent       Float   @default(1.9)     // Fee Shopify Payments %
+  shopifyFeeFixed         Float   @default(0.25)    // Fee Shopify Payments fisso €
+  paypalFeePercent        Float   @default(3.4)     // Fee PayPal %
+  paypalFeeFixed          Float   @default(0.35)    // Fee PayPal fisso €
 
-  // Fee pagamento
-  shopifyFeePercent     Float   @default(1.9)    // Fee Shopify %
-  shopifyFeeFixed       Float   @default(0.25)   // Fee Shopify fisso €
-  paypalFeePercent      Float   @default(3.4)    // Fee PayPal %
-  paypalFeeFixed        Float   @default(0.35)   // Fee PayPal fisso €
+  // Tax
+  vatPercent              Float   @default(22.0)    // Aliquota IVA %
 
-  // IVA
-  vatPercent            Float   @default(22.0)
+  // Meta Ads (Fase 3)
+  metaAccessToken         String?
+  metaAdAccountId         String?
 
-  // Costo spedizione standard per ordine
-  defaultShippingCost   Float   @default(5.00)
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 model FixedCost {

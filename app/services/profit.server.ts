@@ -2,20 +2,24 @@ import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
 import { getSettings } from "./settings.server";
 import { getFixedCostsTotal } from "./fixed-costs.server";
 
-const ORDERS_PROFIT_QUERY = `
-  query OrdersProfit($query: String!, $cursor: String) {
-    orders(first: 250, query: $query, after: $cursor) {
+// ─── GraphQL Query ───────────────────────────────────────────────────────────
+
+const ORDERS_QUERY = `
+  query OrdersProfit($query: String!, $cursor: String, $first: Int!) {
+    orders(first: $first, query: $query, after: $cursor, sortKey: CREATED_AT, reverse: true) {
       edges {
         node {
           id
+          name
           createdAt
           displayFinancialStatus
           tags
           paymentGatewayNames
           totalPriceSet {
-            shopMoney {
-              amount
-            }
+            shopMoney { amount }
+          }
+          totalShippingPriceSet {
+            shopMoney { amount }
           }
           lineItems(first: 50) {
             edges {
@@ -23,9 +27,7 @@ const ORDERS_PROFIT_QUERY = `
                 quantity
                 variant {
                   inventoryItem {
-                    unitCost {
-                      amount
-                    }
+                    unitCost { amount }
                   }
                 }
               }
@@ -41,204 +43,375 @@ const ORDERS_PROFIT_QUERY = `
   }
 `;
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type OrderType =
+  | "standard"
+  | "ritorno_merce"
+  | "reso_cliente_spedisce"
+  | "reso_rimborso_ritiro"
+  | "reso_exchange"
+  | "reso_voucher"
+  | "pending";
+
+export type PaymentMethod = "shopify_payments" | "paypal" | "contrassegno" | "unknown";
+
+export interface OrderDetail {
+  id: string;
+  name: string;
+  createdAt: string;
+  type: OrderType;
+  paymentMethod: PaymentMethod;
+  revenue: number;
+  productCost: number;
+  paymentFees: number;
+  shippingRevenue: number;
+  shippingCostActual: number;
+  logisticsMargin: number;
+  adsAllocation: number;
+  orderProfit: number;
+  finalOrderProfit: number;
+  tags: string[];
+  status: string;
+  hasFreeShipping: boolean;
+}
+
+interface PeriodStats {
+  revenue: number;
+  orders: number;
+  netProfit: number;
+  margin: number;
+  adsSpend: number;
+  logisticsMargin: number;
+  freeShippingCost: number;
+  shippingRevenue: number;
+  codRevenue: number;
+}
+
+export interface ReturnStats {
+  ritornoMerce: { count: number; cost: number };
+  resoClienteSpedisce: { count: number; cost: number; avgCost: number };
+  resoRimborsoRitiro: { count: number; revenue: number; cost: number; netProfit: number };
+  resoExchange: { count: number; revenue: number; cost: number; profit: number };
+  resoVoucher: { count: number; netImpact: number };
+  totalReturns: number;
+  totalReturnCost: number;
+  totalReturnRevenue: number;
+  returnRate: number;
+}
+
+export interface LossStats {
+  returnedPackagesCount: number;
+  returnedPackagesCost: number;
+  returnsCost: number;
+  totalMoneyLost: number;
+}
+
 export interface ProfitStats {
-  today: { revenue: number; orders: number; netProfit: number; margin: number };
-  thisMonth: { revenue: number; orders: number; netProfit: number; margin: number };
-  thisYear: { revenue: number; orders: number; netProfit: number; margin: number };
-  
-  problems: {
-    refusedOrdersCount: number;
-    refusedOrdersCost: number;
-    returnsRefundCount: number;
-    returnsRefundCost: number;
-    returnsExchangeCount: number;
-    returnsExchangeProfit: number;
-  };
-  
+  today: PeriodStats;
+  thisMonth: PeriodStats;
+  thisYear: PeriodStats;
+  returns: ReturnStats;
+  losses: LossStats;
   financials: {
-    averageOrderProfit: number;
-    averageOrderValue: number;
+    avgOrderProfit: number;
+    avgOrderValue: number;
+    roas: number;
+    cpa: number;
     netProfitAfterFixedCosts: number;
   };
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function detectPaymentMethod(gateways: string[], status: string): PaymentMethod {
+  for (const g of gateways) {
+    const lower = g.toLowerCase();
+    if (lower.includes("paypal")) return "paypal";
+    if (lower.includes("cod") || lower.includes("contrassegno") || lower.includes("cash on delivery") || lower.includes("pagamento alla consegna")) return "contrassegno";
+    if (lower.includes("shopify") || lower.includes("credit") || lower.includes("card") || lower.includes("stripe")) return "shopify_payments";
+  }
+  // Fallback: if PENDING and no gateways, assume COD
+  if (status === "PENDING" && gateways.length === 0) return "contrassegno";
+  // Default to shopify_payments for paid orders with unknown gateways
+  if (gateways.length > 0) return "shopify_payments";
+  return "unknown";
+}
+
+function detectOrderType(tags: string[]): OrderType {
+  const upper = tags.map((t: string) => t.toUpperCase().trim());
+  if (upper.includes("RITORNO_MERCE")) return "ritorno_merce";
+  if (upper.includes("RESO_CLIENTE_SPEDISCE")) return "reso_cliente_spedisce";
+  if (upper.includes("RESO_RIMBORSO_RITIRO")) return "reso_rimborso_ritiro";
+  if (upper.includes("RESO_EXCHANGE")) return "reso_exchange";
+  if (upper.includes("RESO_VOUCHER")) return "reso_voucher";
+  return "standard";
+}
+
+function calcPaymentFee(
+  amount: number,
+  method: PaymentMethod,
+  settings: any
+): number {
+  if (method === "paypal") {
+    return (amount * (settings.paypalFeePercent / 100)) + settings.paypalFeeFixed;
+  }
+  if (method === "shopify_payments") {
+    return (amount * (settings.shopifyFeePercent / 100)) + settings.shopifyFeeFixed;
+  }
+  return 0; // COD = no payment fee
+}
+
+function calcLogisticsMargin(
+  method: PaymentMethod,
+  hasFreeShipping: boolean,
+  shippingChargedToCustomer: number,
+  settings: any
+): { margin: number; shippingRev: number; codRev: number; freeShipCost: number } {
+  const isCOD = method === "contrassegno";
+
+  if (!isCOD && !hasFreeShipping) {
+    // SCENARIO 1: Online payment, customer pays shipping
+    const shippingRev = shippingChargedToCustomer > 0 ? shippingChargedToCustomer : settings.shippingRevenue;
+    const feeOnShipping = calcPaymentFee(shippingRev, method, settings);
+    const margin = shippingRev - feeOnShipping - settings.shippingCost;
+    return { margin, shippingRev, codRev: 0, freeShipCost: 0 };
+  }
+
+  if (!isCOD && hasFreeShipping) {
+    // SCENARIO 2: Online payment, free shipping (order >= threshold)
+    return { margin: -settings.shippingCost, shippingRev: 0, codRev: 0, freeShipCost: settings.shippingCost };
+  }
+
+  if (isCOD && !hasFreeShipping) {
+    // SCENARIO 3: COD, customer pays shipping + COD fee
+    const shippingRev = shippingChargedToCustomer > 0 ? shippingChargedToCustomer : settings.shippingRevenue;
+    const codRev = settings.codFeeCharged;
+    const totalLogRev = shippingRev + codRev;
+    const margin = totalLogRev - settings.codCost;
+    return { margin, shippingRev, codRev, freeShipCost: 0 };
+  }
+
+  // SCENARIO 4: COD, free shipping (order >= threshold), customer pays only COD fee
+  const codRev = settings.codFeeCharged;
+  const margin = codRev - settings.codCost;
+  return { margin, shippingRev: 0, codRev, freeShipCost: 0 };
+}
+
+// ─── Main Stats Function ─────────────────────────────────────────────────────
+
 export async function getProfitStats(admin: AdminApiContext, shop: string): Promise<ProfitStats> {
   const settings = await getSettings(shop);
   const monthlyFixedCosts = await getFixedCostsTotal(shop);
-  
-  let hasNextPage = true;
-  let cursor: string | null = null;
-  
-  const stats = {
-    today: { revenue: 0, orders: 0, netProfit: 0, margin: 0 },
-    thisMonth: { revenue: 0, orders: 0, netProfit: 0, margin: 0 },
-    thisYear: { revenue: 0, orders: 0, netProfit: 0, margin: 0 },
-    problems: {
-      refusedOrdersCount: 0,
-      refusedOrdersCost: 0,
-      returnsRefundCount: 0,
-      returnsRefundCost: 0,
-      returnsExchangeCount: 0,
-      returnsExchangeProfit: 0,
-    },
-    financials: {
-      averageOrderProfit: 0,
-      averageOrderValue: 0,
-      netProfitAfterFixedCosts: 0,
-    }
-  };
 
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const startOfYearISO = startOfYear.toISOString().split("T")[0];
+  const queryStr = `created_at:>=${startOfYear.toISOString().split("T")[0]}`;
 
-  const queryStr = `created_at:>=${startOfYearISO}`;
+  const stats: ProfitStats = {
+    today: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
+    thisMonth: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
+    thisYear: { revenue: 0, orders: 0, netProfit: 0, margin: 0, adsSpend: 0, logisticsMargin: 0, freeShippingCost: 0, shippingRevenue: 0, codRevenue: 0 },
+    returns: {
+      ritornoMerce: { count: 0, cost: 0 },
+      resoClienteSpedisce: { count: 0, cost: 0, avgCost: 0 },
+      resoRimborsoRitiro: { count: 0, revenue: 0, cost: 0, netProfit: 0 },
+      resoExchange: { count: 0, revenue: 0, cost: 0, profit: 0 },
+      resoVoucher: { count: 0, netImpact: 0 },
+      totalReturns: 0, totalReturnCost: 0, totalReturnRevenue: 0, returnRate: 0,
+    },
+    losses: { returnedPackagesCount: 0, returnedPackagesCost: 0, returnsCost: 0, totalMoneyLost: 0 },
+    financials: { avgOrderProfit: 0, avgOrderValue: 0, roas: 0, cpa: 0, netProfitAfterFixedCosts: 0 },
+  };
 
   let totalValidOrders = 0;
   let totalValidRevenue = 0;
   let totalValidProfit = 0;
+  let totalOrdersCount = 0;
+  let hasNextPage = true;
+  let cursor: string | null = null;
 
   while (hasNextPage) {
     try {
-      const response: any = await admin.graphql(ORDERS_PROFIT_QUERY, {
-        variables: { query: queryStr, cursor },
+      const response: any = await admin.graphql(ORDERS_QUERY, {
+        variables: { query: queryStr, cursor, first: 250 },
       });
       const json: any = await response.json();
-
-      if (json.errors) {
-        console.error("GraphQL Errors in Profit:", json.errors);
-        break;
-      }
-
-      if (!json.data || !json.data.orders) {
-        break;
-      }
+      if (json.errors || !json.data?.orders) break;
 
       const { orders } = json.data;
 
       for (const edge of orders.edges) {
         const order = edge.node;
         const amount = parseFloat(order.totalPriceSet?.shopMoney?.amount || "0");
+        const shippingCharged = parseFloat(order.totalShippingPriceSet?.shopMoney?.amount || "0");
         const status = order.displayFinancialStatus;
-        const tags = order.tags || [];
-        const gateways = order.paymentGatewayNames || [];
-        
-        // Calcolo Costo Prodotti
-        let cogs = 0;
-        for (const lineEdge of order.lineItems.edges) {
-          const item = lineEdge.node;
-          const unitCostStr = item.variant?.inventoryItem?.unitCost?.amount;
-          if (unitCostStr) {
-            cogs += parseFloat(unitCostStr) * item.quantity;
-          }
-        }
-        
-        const isCOD = gateways.some((g: string) => {
-          const lower = g.toLowerCase();
-          return lower.includes("cod") || lower.includes("contrassegno") || lower.includes("cash on delivery") || lower.includes("pagamento alla consegna");
-        }) || (status === "PENDING" && gateways.length === 0);
+        const tags: string[] = order.tags || [];
+        const gateways: string[] = order.paymentGatewayNames || [];
 
-        const hasAcceptedTag = tags.some((tag: string) => tag.toUpperCase() === "ACCETTATO");
-        const hasRefusedTag = tags.some((tag: string) => tag.toUpperCase() === "COD_RIFIUTATO");
-        const hasReturnRefund = tags.some((tag: string) => tag.toUpperCase() === "RESO_RIMBORSO");
-        const hasReturnExchange = tags.some((tag: string) => tag.toUpperCase() === "RESO_CAMBIO");
+        const method = detectPaymentMethod(gateways, status);
+        const orderType = detectOrderType(tags);
+        const hasFreeShipping = shippingCharged === 0;
+
+        // COGS
+        let cogs = 0;
+        for (const le of order.lineItems.edges) {
+          const uc = le.node.variant?.inventoryItem?.unitCost?.amount;
+          if (uc) cogs += parseFloat(uc) * le.node.quantity;
+        }
 
         const orderDate = new Date(order.createdAt);
         const isToday = orderDate.getDate() === now.getDate() && orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
         const isThisMonth = orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
-        const isThisYear = orderDate.getFullYear() === now.getFullYear();
 
-        // --- CALCOLO COSTI RIFIUTI ---
-        if (hasRefusedTag) {
-          const refusalCost = settings.shippingCostOutbound + settings.codManagementFee + settings.shippingCostReturn;
-          
-          // Li conteggiamo tutti come "problemi storici" o potremmo filtrare per mese/oggi
-          // Per semplicità, aggiungiamo ai totali "thisYear"
-          if (isThisYear) {
-            stats.problems.refusedOrdersCount++;
-            stats.problems.refusedOrdersCost += refusalCost;
-            
-            // Sottraiamo il costo del rifiuto dal profitto globale
-            stats.thisYear.netProfit -= refusalCost;
-            if (isThisMonth) stats.thisMonth.netProfit -= refusalCost;
-            if (isToday) stats.today.netProfit -= refusalCost;
-          }
-          continue; // Ordine rifiutato, stop
+        totalOrdersCount++;
+
+        // ─── EXCEPTION: RITORNO_MERCE ──────────────────────────────────────
+        if (orderType === "ritorno_merce") {
+          // Loss = outbound shipping + COD cost + return shipping (all IVA-inclusive from settings)
+          const loss = settings.shippingCost + settings.codCost + settings.returnShipmentCost;
+          stats.returns.ritornoMerce.count++;
+          stats.returns.ritornoMerce.cost += loss;
+          stats.losses.returnedPackagesCount++;
+          stats.losses.returnedPackagesCost += loss;
+          stats.losses.totalMoneyLost += loss;
+          stats.returns.totalReturns++;
+          stats.returns.totalReturnCost += loss;
+
+          // Subtract from period profits
+          stats.thisYear.netProfit -= loss;
+          if (isThisMonth) stats.thisMonth.netProfit -= loss;
+          if (isToday) stats.today.netProfit -= loss;
+          continue;
         }
 
-        // --- CALCOLO COSTI RESI ---
-        if (hasReturnRefund) {
-          const refundImpact = settings.returnRefundRevenue - settings.returnRefundCost;
-          if (isThisYear) {
-            stats.problems.returnsRefundCount++;
-            stats.problems.returnsRefundCost -= refundImpact; // se l'impatto è positivo, il costo scende, altrimenti sale
-            
-            stats.thisYear.netProfit += refundImpact;
-            if (isThisMonth) stats.thisMonth.netProfit += refundImpact;
-            if (isToday) stats.today.netProfit += refundImpact;
-          }
-          continue; // Ordine reso rimborsato, stop (assumiamo non abbia prodotto la revenue originaria)
+        // ─── EXCEPTION: RESO_CLIENTE_SPEDISCE ──────────────────────────────
+        if (orderType === "reso_cliente_spedisce") {
+          const cost = settings.resoClienteShippingCost;
+          stats.returns.resoClienteSpedisce.count++;
+          stats.returns.resoClienteSpedisce.cost += cost;
+          stats.returns.totalReturns++;
+          stats.returns.totalReturnCost += cost;
+          stats.losses.returnsCost += cost;
+          stats.losses.totalMoneyLost += cost;
+
+          stats.thisYear.netProfit -= cost;
+          if (isThisMonth) stats.thisMonth.netProfit -= cost;
+          if (isToday) stats.today.netProfit -= cost;
+          continue;
         }
 
-        if (hasReturnExchange) {
-          const exchangeProfit = settings.returnExchangeRevenue - settings.returnExchangeCost;
-          if (isThisYear) {
-            stats.problems.returnsExchangeCount++;
-            stats.problems.returnsExchangeProfit += exchangeProfit;
-            
-            // Un cambio mantiene la vendita originaria valida + profitto extra del cambio
-            stats.thisYear.netProfit += exchangeProfit;
-            if (isThisMonth) stats.thisMonth.netProfit += exchangeProfit;
-            if (isToday) stats.today.netProfit += exchangeProfit;
-          }
-          // Non facciamo continue, l'ordine originale è ancora valido
+        // ─── EXCEPTION: RESO_RIMBORSO_RITIRO ───────────────────────────────
+        if (orderType === "reso_rimborso_ritiro") {
+          // Customer pays 9€, company pays ~5€ collection. Fees are refunded.
+          const rev = settings.resoRimborsoRevenue;
+          const cost = settings.resoRimborsoCost;
+          const fee = calcPaymentFee(rev, method, settings);
+          const profit = rev - cost - fee;
+
+          stats.returns.resoRimborsoRitiro.count++;
+          stats.returns.resoRimborsoRitiro.revenue += rev;
+          stats.returns.resoRimborsoRitiro.cost += cost;
+          stats.returns.resoRimborsoRitiro.netProfit += profit;
+          stats.returns.totalReturns++;
+          stats.returns.totalReturnRevenue += rev;
+          stats.returns.totalReturnCost += cost;
+
+          stats.thisYear.netProfit += profit;
+          if (isThisMonth) stats.thisMonth.netProfit += profit;
+          if (isToday) stats.today.netProfit += profit;
+          continue;
         }
 
-        // --- CALCOLO ORDINE VALIDO ---
-        const isValid = 
-          status === "PAID" || 
+        // ─── EXCEPTION: RESO_EXCHANGE ──────────────────────────────────────
+        if (orderType === "reso_exchange") {
+          const rev = settings.resoExchangeRevenue;
+          const cost = settings.resoExchangeCost;
+          const fee = calcPaymentFee(rev, method, settings);
+          const profit = rev - cost - fee;
+
+          stats.returns.resoExchange.count++;
+          stats.returns.resoExchange.revenue += rev;
+          stats.returns.resoExchange.cost += cost;
+          stats.returns.resoExchange.profit += profit;
+          stats.returns.totalReturns++;
+          stats.returns.totalReturnRevenue += rev;
+          stats.returns.totalReturnCost += cost;
+
+          stats.thisYear.netProfit += profit;
+          if (isThisMonth) stats.thisMonth.netProfit += profit;
+          if (isToday) stats.today.netProfit += profit;
+          continue;
+        }
+
+        // ─── EXCEPTION: RESO_VOUCHER ───────────────────────────────────────
+        if (orderType === "reso_voucher") {
+          // Voucher = no cash refund. Impact depends on whether original had free shipping.
+          let netImpact: number;
+          if (hasFreeShipping) {
+            // Case 2: free shipping order. Impact = 0 - shippingCost - paymentFee on original
+            const fee = calcPaymentFee(amount, method, settings);
+            netImpact = 0 - settings.shippingCost - fee;
+          } else {
+            // Case 1: paid shipping order. Impact = shippingRevenue - shippingCost - paymentFee
+            const fee = calcPaymentFee(amount, method, settings);
+            netImpact = shippingCharged - settings.shippingCost - fee;
+          }
+
+          stats.returns.resoVoucher.count++;
+          stats.returns.resoVoucher.netImpact += netImpact;
+          stats.returns.totalReturns++;
+          if (netImpact < 0) {
+            stats.losses.returnsCost += Math.abs(netImpact);
+            stats.losses.totalMoneyLost += Math.abs(netImpact);
+          }
+
+          stats.thisYear.netProfit += netImpact;
+          if (isThisMonth) stats.thisMonth.netProfit += netImpact;
+          if (isToday) stats.today.netProfit += netImpact;
+          continue;
+        }
+
+        // ─── STANDARD ORDER ────────────────────────────────────────────────
+        const hasAcceptedTag = tags.some((t: string) => t.toUpperCase().trim() === "ACCETTATO");
+        const isCOD = method === "contrassegno";
+
+        const isValid =
+          status === "PAID" ||
           status === "PARTIALLY_PAID" ||
           (isCOD && hasAcceptedTag);
 
-        if (isValid) {
-          // Calcolo Fees
-          const hasPaypal = gateways.some((g: string) => g.toLowerCase().includes("paypal"));
-          let paymentFee = 0;
-          if (hasPaypal) {
-            paymentFee = (amount * (settings.paypalFeePercent / 100)) + settings.paypalFeeFixed;
-          } else if (!isCOD) { // Assumiamo Shopify Payments per altri metodi online
-            paymentFee = (amount * (settings.shopifyFeePercent / 100)) + settings.shopifyFeeFixed;
-          }
+        if (!isValid) continue; // Skip pending/unconfirmed orders
 
-          // Rimuoviamo IVA (scorporo dal totale lordo per avere netto ricavi)
-          // Se amount include IVA: Netto = amount / (1 + (VAT/100))
-          const revenueSenzaIva = amount / (1 + (settings.vatPercent / 100));
+        // Payment fees on product revenue (excluding shipping)
+        const productRevenue = amount - shippingCharged;
+        const paymentFees = calcPaymentFee(productRevenue, method, settings);
 
-          // Profitto netto ordine
-          const orderProfit = revenueSenzaIva - cogs - settings.defaultShippingCost - paymentFee;
+        // Logistics margin
+        const logistics = calcLogisticsMargin(method, hasFreeShipping, shippingCharged, settings);
 
-          totalValidOrders++;
-          totalValidRevenue += amount;
-          totalValidProfit += orderProfit;
+        // Order profit = Revenue(products only, no IVA) - COGS - Payment Fees + Logistics Margin
+        const revenueExVat = productRevenue / (1 + (settings.vatPercent / 100));
+        const orderProfit = revenueExVat - cogs - paymentFees + logistics.margin;
 
-          if (isThisYear) {
-            stats.thisYear.revenue += amount;
-            stats.thisYear.orders++;
-            stats.thisYear.netProfit += orderProfit;
-            
-            if (isThisMonth) {
-              stats.thisMonth.revenue += amount;
-              stats.thisMonth.orders++;
-              stats.thisMonth.netProfit += orderProfit;
-              
-              if (isToday) {
-                stats.today.revenue += amount;
-                stats.today.orders++;
-                stats.today.netProfit += orderProfit;
-              }
-            }
-          }
-        }
+        totalValidOrders++;
+        totalValidRevenue += amount;
+        totalValidProfit += orderProfit;
+
+        // Aggregate into periods
+        const addToPeriod = (p: PeriodStats) => {
+          p.revenue += amount;
+          p.orders++;
+          p.netProfit += orderProfit;
+          p.logisticsMargin += logistics.margin;
+          p.freeShippingCost += logistics.freeShipCost;
+          p.shippingRevenue += logistics.shippingRev;
+          p.codRevenue += logistics.codRev;
+        };
+
+        addToPeriod(stats.thisYear);
+        if (isThisMonth) addToPeriod(stats.thisMonth);
+        if (isToday) addToPeriod(stats.today);
       }
 
       hasNextPage = orders.pageInfo.hasNextPage;
@@ -249,256 +422,227 @@ export async function getProfitStats(admin: AdminApiContext, shop: string): Prom
     }
   }
 
-  // Calcolo margini
-  stats.today.margin = stats.today.revenue > 0 ? (stats.today.netProfit / stats.today.revenue) * 100 : 0;
-  stats.thisMonth.margin = stats.thisMonth.revenue > 0 ? (stats.thisMonth.netProfit / stats.thisMonth.revenue) * 100 : 0;
-  stats.thisYear.margin = stats.thisYear.revenue > 0 ? (stats.thisYear.netProfit / stats.thisYear.revenue) * 100 : 0;
+  // Margins
+  for (const p of [stats.today, stats.thisMonth, stats.thisYear]) {
+    p.margin = p.revenue > 0 ? (p.netProfit / p.revenue) * 100 : 0;
+  }
 
-  // Calcoli finanziari
-  stats.financials.averageOrderValue = totalValidOrders > 0 ? totalValidRevenue / totalValidOrders : 0;
-  stats.financials.averageOrderProfit = totalValidOrders > 0 ? totalValidProfit / totalValidOrders : 0;
-  
-  // Il profitto netto dopo costi fissi viene calcolato prendendo il profitto mensile e sottraendo i costi fissi mensili
-  // (Nota: per maggiore precisione si dovrebbero ripartire i costi fissi giornalmente, ma il piano richiede un calcolo generale)
+  // Returns
+  const rc = stats.returns.resoClienteSpedisce;
+  rc.avgCost = rc.count > 0 ? rc.cost / rc.count : 0;
+  stats.returns.returnRate = totalOrdersCount > 0 ? (stats.returns.totalReturns / totalOrdersCount) * 100 : 0;
+
+  // Financials
+  stats.financials.avgOrderValue = totalValidOrders > 0 ? totalValidRevenue / totalValidOrders : 0;
+  stats.financials.avgOrderProfit = totalValidOrders > 0 ? totalValidProfit / totalValidOrders : 0;
   stats.financials.netProfitAfterFixedCosts = stats.thisMonth.netProfit - monthlyFixedCosts;
 
   return stats;
 }
 
-// --- FASE 2: Dettaglio Ordini ---
-
-export interface OrderDetail {
-  id: string;
-  name: string;
-  createdAt: string;
-  revenue: number;
-  cogs: number;
-  shippingCost: number;
-  paymentFee: number;
-  netProfit: number;
-  margin: number;
-  status: string;
-  tags: string[];
-  gateway: string;
-  type: "valid" | "cod_refused" | "return_refund" | "return_exchange" | "pending";
-}
-
-const ORDERS_DETAIL_QUERY = `
-  query OrdersDetail($query: String!, $cursor: String) {
-    orders(first: 50, query: $query, after: $cursor, sortKey: CREATED_AT, reverse: true) {
-      edges {
-        node {
-          id
-          name
-          createdAt
-          displayFinancialStatus
-          tags
-          paymentGatewayNames
-          totalPriceSet {
-            shopMoney {
-              amount
-            }
-          }
-          lineItems(first: 50) {
-            edges {
-              node {
-                quantity
-                variant {
-                  inventoryItem {
-                    unitCost {
-                      amount
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-    }
-  }
-`;
+// ─── Order Details (for the orders table page) ───────────────────────────────
 
 export async function getOrdersDetail(
   admin: AdminApiContext,
   shop: string,
-  options: { month?: number; year?: number; page?: number } = {}
-): Promise<{ orders: OrderDetail[]; hasNextPage: boolean; endCursor: string | null }> {
+  options: { month?: number; year?: number } = {}
+): Promise<{ orders: OrderDetail[]; hasNextPage: boolean }> {
   const settings = await getSettings(shop);
-
   const now = new Date();
   const year = options.year ?? now.getFullYear();
-  const month = options.month ?? (now.getMonth() + 1); // 1-indexed
+  const month = options.month ?? (now.getMonth() + 1);
 
   const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59); // last day of month
-
-  const startISO = startDate.toISOString().split("T")[0];
-  const endISO = endDate.toISOString().split("T")[0];
-
-  const queryStr = `created_at:>=${startISO} created_at:<=${endISO}`;
+  const endDate = new Date(year, month, 0);
+  const queryStr = `created_at:>=${startDate.toISOString().split("T")[0]} created_at:<=${endDate.toISOString().split("T")[0]}`;
 
   const result: OrderDetail[] = [];
   let hasNextPage = false;
-  let endCursor: string | null = null;
 
-  // For the orders detail page we only fetch one page of 50 at a time
   try {
-    const response: any = await admin.graphql(ORDERS_DETAIL_QUERY, {
-      variables: { query: queryStr, cursor: null },
+    const response: any = await admin.graphql(ORDERS_QUERY, {
+      variables: { query: queryStr, cursor: null, first: 50 },
     });
     const json: any = await response.json();
-
-    if (json.errors) {
-      console.error("GraphQL Errors in OrdersDetail:", json.errors);
-      return { orders: [], hasNextPage: false, endCursor: null };
-    }
-
-    if (!json.data?.orders) {
-      return { orders: [], hasNextPage: false, endCursor: null };
-    }
+    if (json.errors || !json.data?.orders) return { orders: [], hasNextPage: false };
 
     const { orders } = json.data;
     hasNextPage = orders.pageInfo.hasNextPage;
-    endCursor = orders.pageInfo.endCursor;
 
     for (const edge of orders.edges) {
       const order = edge.node;
       const amount = parseFloat(order.totalPriceSet?.shopMoney?.amount || "0");
+      const shippingCharged = parseFloat(order.totalShippingPriceSet?.shopMoney?.amount || "0");
       const status = order.displayFinancialStatus;
       const tags: string[] = order.tags || [];
       const gateways: string[] = order.paymentGatewayNames || [];
 
-      // COGS
+      const method = detectPaymentMethod(gateways, status);
+      const orderType = detectOrderType(tags);
+      const hasFreeShipping = shippingCharged === 0;
+
       let cogs = 0;
-      for (const lineEdge of order.lineItems.edges) {
-        const item = lineEdge.node;
-        const unitCostStr = item.variant?.inventoryItem?.unitCost?.amount;
-        if (unitCostStr) {
-          cogs += parseFloat(unitCostStr) * item.quantity;
-        }
+      for (const le of order.lineItems.edges) {
+        const uc = le.node.variant?.inventoryItem?.unitCost?.amount;
+        if (uc) cogs += parseFloat(uc) * le.node.quantity;
       }
 
-      const isCOD = gateways.some((g: string) => {
-        const lower = g.toLowerCase();
-        return lower.includes("cod") || lower.includes("contrassegno") || lower.includes("cash on delivery") || lower.includes("pagamento alla consegna");
-      }) || (status === "PENDING" && gateways.length === 0);
+      const base: Partial<OrderDetail> = {
+        id: order.id,
+        name: order.name,
+        createdAt: order.createdAt,
+        paymentMethod: method,
+        tags,
+        status,
+        hasFreeShipping,
+        adsAllocation: 0, // Phase 3
+      };
 
-      const hasAcceptedTag = tags.some((t: string) => t.toUpperCase() === "ACCETTATO");
-      const hasRefusedTag = tags.some((t: string) => t.toUpperCase() === "COD_RIFIUTATO");
-      const hasReturnRefund = tags.some((t: string) => t.toUpperCase() === "RESO_RIMBORSO");
-      const hasReturnExchange = tags.some((t: string) => t.toUpperCase() === "RESO_CAMBIO");
-
-      const gatewayDisplay = gateways.length > 0 ? gateways[0] : (isCOD ? "COD" : "N/A");
-
-      // Refused
-      if (hasRefusedTag) {
-        const refusalCost = settings.shippingCostOutbound + settings.codManagementFee + settings.shippingCostReturn;
+      // ─── RITORNO_MERCE ───
+      if (orderType === "ritorno_merce") {
+        const loss = settings.shippingCost + settings.codCost + settings.returnShipmentCost;
         result.push({
-          id: order.id,
-          name: order.name,
-          createdAt: order.createdAt,
+          ...base as any,
+          type: "ritorno_merce",
           revenue: 0,
-          cogs: 0,
-          shippingCost: refusalCost,
-          paymentFee: 0,
-          netProfit: -refusalCost,
-          margin: -100,
-          status,
-          tags,
-          gateway: gatewayDisplay,
-          type: "cod_refused",
+          productCost: 0,
+          paymentFees: 0,
+          shippingRevenue: 0,
+          shippingCostActual: loss,
+          logisticsMargin: -loss,
+          orderProfit: -loss,
+          finalOrderProfit: -loss,
         });
         continue;
       }
 
-      // Return refund
-      if (hasReturnRefund) {
-        const refundImpact = settings.returnRefundRevenue - settings.returnRefundCost;
+      // ─── RESO_CLIENTE_SPEDISCE ───
+      if (orderType === "reso_cliente_spedisce") {
+        const cost = settings.resoClienteShippingCost;
         result.push({
-          id: order.id,
-          name: order.name,
-          createdAt: order.createdAt,
-          revenue: settings.returnRefundRevenue,
-          cogs: 0,
-          shippingCost: settings.returnRefundCost,
-          paymentFee: 0,
-          netProfit: refundImpact,
-          margin: settings.returnRefundRevenue > 0 ? (refundImpact / settings.returnRefundRevenue) * 100 : 0,
-          status,
-          tags,
-          gateway: gatewayDisplay,
-          type: "return_refund",
+          ...base as any,
+          type: "reso_cliente_spedisce",
+          revenue: 0,
+          productCost: 0,
+          paymentFees: 0,
+          shippingRevenue: 0,
+          shippingCostActual: cost,
+          logisticsMargin: -cost,
+          orderProfit: -cost,
+          finalOrderProfit: -cost,
         });
         continue;
       }
 
-      // Valid or pending
-      const isValid =
-        status === "PAID" ||
-        status === "PARTIALLY_PAID" ||
-        (isCOD && hasAcceptedTag);
-
-      if (isValid) {
-        const hasPaypal = gateways.some((g: string) => g.toLowerCase().includes("paypal"));
-        let paymentFee = 0;
-        if (hasPaypal) {
-          paymentFee = (amount * (settings.paypalFeePercent / 100)) + settings.paypalFeeFixed;
-        } else if (!isCOD) {
-          paymentFee = (amount * (settings.shopifyFeePercent / 100)) + settings.shopifyFeeFixed;
-        }
-
-        const revenueSenzaIva = amount / (1 + (settings.vatPercent / 100));
-        const shippingCost = settings.defaultShippingCost;
-        let orderProfit = revenueSenzaIva - cogs - shippingCost - paymentFee;
-
-        // If it also has return exchange tag, add that profit
-        if (hasReturnExchange) {
-          const exchangeProfit = settings.returnExchangeRevenue - settings.returnExchangeCost;
-          orderProfit += exchangeProfit;
-        }
-
+      // ─── RESO_RIMBORSO_RITIRO ───
+      if (orderType === "reso_rimborso_ritiro") {
+        const rev = settings.resoRimborsoRevenue;
+        const cost = settings.resoRimborsoCost;
+        const fee = calcPaymentFee(rev, method, settings);
+        const profit = rev - cost - fee;
         result.push({
-          id: order.id,
-          name: order.name,
-          createdAt: order.createdAt,
-          revenue: amount,
-          cogs,
-          shippingCost,
-          paymentFee,
-          netProfit: orderProfit,
-          margin: amount > 0 ? (orderProfit / amount) * 100 : 0,
-          status,
-          tags,
-          gateway: gatewayDisplay,
-          type: hasReturnExchange ? "return_exchange" : "valid",
+          ...base as any,
+          type: "reso_rimborso_ritiro",
+          revenue: rev,
+          productCost: 0,
+          paymentFees: fee,
+          shippingRevenue: 0,
+          shippingCostActual: cost,
+          logisticsMargin: 0,
+          orderProfit: profit,
+          finalOrderProfit: profit,
         });
-      } else {
-        // Pending / not yet valid
+        continue;
+      }
+
+      // ─── RESO_EXCHANGE ───
+      if (orderType === "reso_exchange") {
+        const rev = settings.resoExchangeRevenue;
+        const cost = settings.resoExchangeCost;
+        const fee = calcPaymentFee(rev, method, settings);
+        const profit = rev - cost - fee;
         result.push({
-          id: order.id,
-          name: order.name,
-          createdAt: order.createdAt,
-          revenue: amount,
-          cogs,
-          shippingCost: 0,
-          paymentFee: 0,
-          netProfit: 0,
-          margin: 0,
-          status,
-          tags,
-          gateway: gatewayDisplay,
+          ...base as any,
+          type: "reso_exchange",
+          revenue: rev,
+          productCost: 0,
+          paymentFees: fee,
+          shippingRevenue: 0,
+          shippingCostActual: cost,
+          logisticsMargin: 0,
+          orderProfit: profit,
+          finalOrderProfit: profit,
+        });
+        continue;
+      }
+
+      // ─── RESO_VOUCHER ───
+      if (orderType === "reso_voucher") {
+        const fee = calcPaymentFee(amount, method, settings);
+        let netImpact: number;
+        if (hasFreeShipping) {
+          netImpact = 0 - settings.shippingCost - fee;
+        } else {
+          netImpact = shippingCharged - settings.shippingCost - fee;
+        }
+        result.push({
+          ...base as any,
+          type: "reso_voucher",
+          revenue: hasFreeShipping ? 0 : shippingCharged,
+          productCost: 0,
+          paymentFees: fee,
+          shippingRevenue: hasFreeShipping ? 0 : shippingCharged,
+          shippingCostActual: settings.shippingCost,
+          logisticsMargin: netImpact,
+          orderProfit: netImpact,
+          finalOrderProfit: netImpact,
+        });
+        continue;
+      }
+
+      // ─── STANDARD ORDER ───
+      const hasAcceptedTag = tags.some((t: string) => t.toUpperCase().trim() === "ACCETTATO");
+      const isCOD = method === "contrassegno";
+      const isValid = status === "PAID" || status === "PARTIALLY_PAID" || (isCOD && hasAcceptedTag);
+
+      if (!isValid) {
+        result.push({
+          ...base as any,
           type: "pending",
+          revenue: amount,
+          productCost: cogs,
+          paymentFees: 0,
+          shippingRevenue: shippingCharged,
+          shippingCostActual: 0,
+          logisticsMargin: 0,
+          orderProfit: 0,
+          finalOrderProfit: 0,
         });
+        continue;
       }
+
+      const productRevenue = amount - shippingCharged;
+      const paymentFees = calcPaymentFee(productRevenue, method, settings);
+      const logistics = calcLogisticsMargin(method, hasFreeShipping, shippingCharged, settings);
+      const revenueExVat = productRevenue / (1 + (settings.vatPercent / 100));
+      const orderProfit = revenueExVat - cogs - paymentFees + logistics.margin;
+
+      result.push({
+        ...base as any,
+        type: "standard",
+        revenue: amount,
+        productCost: cogs,
+        paymentFees,
+        shippingRevenue: logistics.shippingRev,
+        shippingCostActual: settings.shippingCost,
+        logisticsMargin: logistics.margin,
+        orderProfit,
+        finalOrderProfit: orderProfit, // ads allocation added in Phase 3
+      });
     }
   } catch (e) {
     console.error("Error fetching order details:", e);
   }
 
-  return { orders: result, hasNextPage, endCursor };
+  return { orders: result, hasNextPage };
 }
