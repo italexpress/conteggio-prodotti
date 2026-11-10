@@ -202,6 +202,14 @@ export async function getAggregatedProducts(
         continue;
       }
 
+      // Le spedizioni exchange sono servizi, non prodotti da preparare.
+      // Gli ordini misti mantengono soltanto le altre righe nel conteggio.
+      const productLineItems = order.lineItems.edges.filter((e: any) =>
+        e.node.currentQuantity > 0 &&
+        e.node.title.trim().replace(/\s+/g, " ").toUpperCase() !== "SPEDIZIONE EXCHANGE"
+      );
+      if (productLineItems.length === 0) continue;
+
       const gateways = order.paymentGatewayNames || [];
       const isCOD = gateways.some((g: string) => {
         const lower = g.toLowerCase();
@@ -222,8 +230,7 @@ export async function getAggregatedProducts(
       // Se è un COD senza tag ACCETTATO, aggiungilo alla lista "da confermare"
       if (isCOD && !hasAcceptedTag) {
         const customerName = "Cliente"; // Rimosso per limiti permessi Shopify Protected Data
-        const items = order.lineItems.edges
-          .filter((e: any) => e.node.currentQuantity > 0)
+        const items = productLineItems
           .map((e: any) => ({
             title: e.node.variantTitle
               ? `${e.node.title} - ${e.node.variantTitle}`
@@ -250,7 +257,7 @@ export async function getAggregatedProducts(
 
       orderCount++;
 
-      for (const lineItemEdge of order.lineItems.edges) {
+      for (const lineItemEdge of productLineItems) {
         const item = lineItemEdge.node;
 
         // Salta items con quantità 0 (già completamente evasi)
