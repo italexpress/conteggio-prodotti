@@ -61,6 +61,7 @@ export function IncomingProductList({ items }: IncomingProductListProps) {
                     {item.displayName}
                   </Text>
                   <InlineStack gap="200">
+                    {item.supplier && <Text as="span">{item.supplier} · Codice: {item.supplierCode}</Text>}
                     <Badge tone="info">{item.quantity} pz</Badge>
                     {item.expectedArrivalDate && (
                       <Badge>
