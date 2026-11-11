@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { getAggregatedProducts } from './orders.server.ts';
 
 const line = (title, quantity = 1) => ({ node: {
-  title, currentQuantity: quantity, variantTitle: 'Nero / S',
+  title, currentQuantity: quantity, unfulfilledQuantity: quantity, requiresShipping: true, variantTitle: 'Nero / S',
   product: { id: title }, variant: { id: title },
 } });
 const order = (id, lines, cod = false, accepted = false) => ({ node: {
@@ -54,3 +54,24 @@ test('an exchange service plus removed products is excluded', async () => {
   assert.equal(result.orderCount, 0);
 });
 
+test('purchasing excludes pending, attention, held and partially refunded demand', async () => {
+  const paid=order('paid',[line('PANTALONE WB',3)]);
+  paid.node.lineItems.edges[0].node.unfulfilledQuantity=1;
+  const accepted=order('accepted',[line('PANTALONE WB',2)],true,true);
+  const waiting=order('waiting',[line('PANTALONE WB',5)],true);
+  const attention=order('attention',[line('PANTALONE WB',7)],true,true);
+  attention.node.tags.push('RICHIEDE ATTENZIONE');
+  const held=order('held',[line('PANTALONE WB',9)]);held.node.displayFulfillmentStatus='ON_HOLD';
+  const refunded=order('refunded',[line('PANTALONE WB',4)]);refunded.node.displayFinancialStatus='PARTIALLY_REFUNDED';
+  const result=await getAggregatedProducts(admin([[paid,accepted,waiting,attention,held,refunded]]));
+  assert.equal(result.products[0].purchaseQuantity,3);
+  assert.equal(result.products[0].totalQuantity,28);
+});
+
+test('cancelled and test orders and COD fees do not create purchasing demand',async()=>{
+  const cancelled=order('cancelled',[line('PANTALONE WB')]);cancelled.node.cancelledAt='2026-11-10';
+  const fake=order('test',[line('PANTALONE WB')]);fake.node.test=true;
+  const fees=order('fees',[line('Pagamento alla Consegna'),line('Commissione pagamento alla consegna')]);
+  const result=await getAggregatedProducts(admin([[cancelled,fake,fees]]));
+  assert.equal(result.orderCount,0);
+});

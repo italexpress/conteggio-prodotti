@@ -8,6 +8,7 @@ export interface AggregatedProduct {
   variantTitle: string;
   displayName: string;
   totalQuantity: number;
+  purchaseQuantity?: number;
   codQuantity: number;
   codAcceptedQuantity: number; // Contrassegni con tag "ACCETTATO"
 }
@@ -85,13 +86,15 @@ const UNFULFILLED_ORDERS_QUERY = `
     orders(
       first: 50
       after: $cursor
-      query: "fulfillment_status:unfulfilled OR fulfillment_status:partial"
+      query: "created_at:>='2026-09-30T22:00:00Z' (fulfillment_status:unfulfilled OR fulfillment_status:partial) -status:cancelled -financial_status:refunded"
       sortKey: CREATED_AT
     ) {
       edges {
         node {
           id
           name
+          cancelledAt
+          test
           tags
           createdAt
           paymentGatewayNames
@@ -103,12 +106,19 @@ const UNFULFILLED_ORDERS_QUERY = `
               currencyCode
             }
           }
-          lineItems(first: 250) {
+          fulfillmentOrders(first: 50) {
+            nodes { status }
+            pageInfo { hasNextPage }
+          }
+          lineItems(first: 50) {
+            pageInfo { hasNextPage endCursor }
             edges {
               node {
                 title
                 variantTitle
                 currentQuantity
+                unfulfilledQuantity
+                requiresShipping
                 product {
                   id
                 }
@@ -140,7 +150,7 @@ const UNFULFILLED_ORDERS_QUERY = `
  * - Ordini completamente evasi
  * - Ordini rimborsati
  * 
- * Usa currentQuantity per tenere conto delle quantità già evase
+ * Usa unfulfilledQuantity per escludere le quantita gia evase
  * in ordini parzialmente evasi.
  * 
  * Traccia separatamente i contrassegni con tag "ACCETTATO".
@@ -184,18 +194,32 @@ export async function getAggregatedProducts(
       if (json.errors) {
         console.error("GraphQL Errors:", JSON.stringify(json.errors, null, 2));
         // Se c'è un errore, smettiamo di ciclare ma non crashiamo
-        break;
+        throw new Error("Lettura Shopify incompleta: aggiornare i dati");
       }
 
       if (!json.data || !json.data.orders) {
         console.error("GraphQL Response missing data.orders:", json);
-        break;
+        throw new Error("Lettura Shopify incompleta: aggiornare i dati");
       }
 
       const { orders } = json.data;
 
     for (const edge of orders.edges) {
       const order = edge.node;
+      if (order.cancelledAt || order.test) continue;
+      if (order.fulfillmentOrders?.pageInfo.hasNextPage) throw new Error("Conteggio evasione incompleto");
+      while (order.lineItems.pageInfo?.hasNextPage) {
+        const response = await admin.graphql(`query MoreOrderLines($id: ID!, $after: String!) {
+          order(id: $id) { lineItems(first: 50, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            edges { node { title variantTitle currentQuantity unfulfilledQuantity requiresShipping product { id } variant { id } } }
+          } }
+        }`, { variables: { id: order.id, after: order.lineItems.pageInfo.endCursor } });
+        const extra: any = await response.json();
+        if (extra.errors || !extra.data?.order) throw new Error("Lettura righe ordine incompleta");
+        order.lineItems.edges.push(...extra.data.order.lineItems.edges);
+        order.lineItems.pageInfo = extra.data.order.lineItems.pageInfo;
+      }
 
       // Filtra solo ordini con stato finanziario accettato
       if (!acceptedFinancialStatuses.has(order.displayFinancialStatus)) {
@@ -205,8 +229,8 @@ export async function getAggregatedProducts(
       // Le spedizioni exchange sono servizi, non prodotti da preparare.
       // Gli ordini misti mantengono soltanto le altre righe nel conteggio.
       const productLineItems = order.lineItems.edges.filter((e: any) =>
-        e.node.currentQuantity > 0 &&
-        e.node.title.trim().replace(/\s+/g, " ").toUpperCase() !== "SPEDIZIONE EXCHANGE"
+        e.node.unfulfilledQuantity > 0 && e.node.requiresShipping &&
+        !["SPEDIZIONE EXCHANGE", "PAGAMENTO ALLA CONSEGNA", "COMMISSIONE PAGAMENTO ALLA CONSEGNA"].includes(e.node.title.trim().replace(/\s+/g, " ").toUpperCase())
       );
       if (productLineItems.length === 0) continue;
 
@@ -221,7 +245,12 @@ export async function getAggregatedProducts(
       const orderTags = order.tags || [];
       const hasAcceptedTag = orderTags.some((tag: string) => tag.toUpperCase() === "ACCETTATO");
       
-      const isCodAccepted = isCOD && hasAcceptedTag;
+      const attention = orderTags.some((tag: string) => tag.toUpperCase() === "RICHIEDE ATTENZIONE");
+      const held = ["ON_HOLD", "SCHEDULED", "INCOMPLETE"].includes(order.displayFulfillmentStatus) ||
+        order.fulfillmentOrders?.nodes.some((f: any) => ["ON_HOLD", "SCHEDULED", "INCOMPLETE"].includes(f.status));
+      const isCodAccepted = isCOD && hasAcceptedTag && !attention && !held;
+      const operational = !attention && !held && (order.displayFinancialStatus === "PAID" ||
+        (order.displayFinancialStatus === "PENDING" && hasAcceptedTag));
 
       if (isCodAccepted) {
         codAcceptedCount++;
@@ -235,7 +264,7 @@ export async function getAggregatedProducts(
             title: e.node.variantTitle
               ? `${e.node.title} - ${e.node.variantTitle}`
               : e.node.title,
-            quantity: e.node.currentQuantity,
+            quantity: e.node.unfulfilledQuantity,
           }));
 
         const itemCount = items.reduce((sum: number, i: any) => sum + i.quantity, 0);
@@ -261,7 +290,7 @@ export async function getAggregatedProducts(
         const item = lineItemEdge.node;
 
         // Salta items con quantità 0 (già completamente evasi)
-        if (item.currentQuantity <= 0) continue;
+        if (item.unfulfilledQuantity <= 0) continue;
 
         // Salta items senza prodotto o variante (prodotti eliminati)
         if (!item.product?.id || !item.variant?.id) continue;
@@ -278,7 +307,7 @@ export async function getAggregatedProducts(
           name: order.name,
           createdAt: order.createdAt,
           customerName: "Cliente", // Shopify limit bypass
-          quantity: item.currentQuantity,
+          quantity: item.unfulfilledQuantity,
         });
 
         // Costruisci il nome display combinando titolo prodotto + variante
@@ -288,12 +317,13 @@ export async function getAggregatedProducts(
 
         const existing = productMap.get(variantId);
         if (existing) {
-          existing.totalQuantity += item.currentQuantity;
+          existing.totalQuantity += item.unfulfilledQuantity;
+          existing.purchaseQuantity = (existing.purchaseQuantity || 0) + (operational ? item.unfulfilledQuantity : 0);
           if (isCOD) {
-            existing.codQuantity += item.currentQuantity;
+            existing.codQuantity += item.unfulfilledQuantity;
           }
           if (isCodAccepted) {
-            existing.codAcceptedQuantity += item.currentQuantity;
+            existing.codAcceptedQuantity += item.unfulfilledQuantity;
           }
         } else {
           productMap.set(variantId, {
@@ -302,9 +332,10 @@ export async function getAggregatedProducts(
             productTitle: item.title,
             variantTitle: item.variantTitle || "",
             displayName,
-            totalQuantity: item.currentQuantity,
-            codQuantity: isCOD ? item.currentQuantity : 0,
-            codAcceptedQuantity: isCodAccepted ? item.currentQuantity : 0,
+            totalQuantity: item.unfulfilledQuantity,
+            purchaseQuantity: operational ? item.unfulfilledQuantity : 0,
+            codQuantity: isCOD ? item.unfulfilledQuantity : 0,
+            codAcceptedQuantity: isCodAccepted ? item.unfulfilledQuantity : 0,
           });
         }
       }
@@ -314,7 +345,7 @@ export async function getAggregatedProducts(
     cursor = orders.pageInfo.endCursor;
     } catch (error) {
       console.error("Caught error in GraphQL fetch:", error);
-      break;
+      throw error;
     }
   }
 
