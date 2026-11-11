@@ -109,3 +109,43 @@ model FixedCost {
 
   @@index([shop])
 }
+
+model SupplierProduct {
+  id           String @id @default(cuid())
+  shop         String
+  groupKey     String
+  productId    String
+  colorKey     String
+  supplier     String @default("")
+  supplierCode String @default("")
+  notes        String @default("")
+  packType     String @default("assorted")
+  updatedAt    DateTime @updatedAt
+  @@unique([shop, groupKey])
+}
+
+model ManualProductStock {
+  id        String @id @default(cuid())
+  shop      String
+  variantId String
+  quantity  Int
+  updatedAt DateTime @updatedAt
+  @@unique([shop, variantId])
+}
+
+model SupplierPurchase {
+  id           String @id
+  shop         String
+  groupKey     String
+  productTitle String
+  supplier     String
+  supplierCode String
+  notes        String
+  packType     String
+  packs        Int
+  items        Json
+  expectedArrivalDate DateTime?
+  status       String @default("ordered")
+  createdAt    DateTime @default(now())
+  @@index([shop, createdAt])
+}
