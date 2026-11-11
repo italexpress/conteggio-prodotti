@@ -12,6 +12,8 @@ export interface IncomingProductData {
   quantity: number;
   expectedArrivalDate: string | null;
   createdAt: string;
+  supplier?: string;
+  supplierCode?: string;
 }
 
 /**

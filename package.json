@@ -2,6 +2,7 @@
   "name": "app",
   "private": true,
   "scripts": {
+    "prebuild": "node setup-purchasing.mjs",
     "build": "remix vite:build",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",

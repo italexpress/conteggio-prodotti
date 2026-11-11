@@ -15,15 +15,22 @@ import {
 import { useState, useMemo } from "react";
 import { useFetcher } from "@remix-run/react";
 import type { AggregatedProduct } from "../services/orders.server";
+import { PurchasePlanner } from './PurchasePlanner';
 
 interface ProductsNeededTableProps {
   products: AggregatedProduct[];
   orderCount: number;
+  incomingMap: Record<string, number>;
+  purchasing: any;
+  catalogs: Record<string, any>;
 }
 
 export function ProductsNeededTable({
   products,
   orderCount,
+  incomingMap,
+  purchasing,
+  catalogs,
 }: ProductsNeededTableProps) {
   const [searchValue, setSearchValue] = useState("");
   const [viewMode, setViewMode] = useState<"variants" | "grouped">("variants");
@@ -142,7 +149,7 @@ export function ProductsNeededTable({
       <IndexTable.Cell>
         {product.codAcceptedQuantity > 0 ? (
           <Badge tone="success" size="medium">
-            ✅ {String(product.codAcceptedQuantity)}
+            {`Accettati: ${product.codAcceptedQuantity}`}
           </Badge>
         ) : product.codQuantity > 0 ? (
           <Badge tone="critical" size="medium">
@@ -200,6 +207,16 @@ export function ProductsNeededTable({
     { label: "Nome (Z-A)", value: "name_desc" },
   ];
 
+  if (viewMode === 'grouped') return (
+    <BlockStack gap="400">
+      <ButtonGroup>
+        <Button onClick={() => setViewMode('variants')}>Dettagliato (con taglie)</Button>
+        <Button pressed>Generale (senza taglie)</Button>
+      </ButtonGroup>
+      <PurchasePlanner products={products} incomingMap={incomingMap} purchasing={purchasing} catalogs={catalogs} />
+    </BlockStack>
+  );
+
   return (
     <BlockStack gap="400">
       <InlineStack align="space-between" blockAlign="center">
@@ -207,16 +224,16 @@ export function ProductsNeededTable({
           Lista prodotti da preparare
         </Text>
         <InlineStack gap="200">
-          <Badge>{sortedProducts.length} righe</Badge>
-          <Badge tone="attention">{totalItems} pz totali</Badge>
+          <Badge>{`${sortedProducts.length} righe`}</Badge>
+          <Badge tone="attention">{`${totalItems} pz totali`}</Badge>
           {totalCod > 0 && (
-            <Badge tone="warning">{totalCod} in contrassegno</Badge>
+            <Badge tone="warning">{`${totalCod} in contrassegno`}</Badge>
           )}
         </InlineStack>
       </InlineStack>
 
       <InlineStack align="space-between" blockAlign="center">
-        <ButtonGroup segmented>
+        <ButtonGroup>
           <Button
             pressed={viewMode === "variants"}
             onClick={() => setViewMode("variants")}
@@ -224,7 +241,7 @@ export function ProductsNeededTable({
             Dettagliato (con taglie)
           </Button>
           <Button
-            pressed={viewMode === "grouped"}
+            pressed={false}
             onClick={() => setViewMode("grouped")}
           >
             Generale (senza taglie)

@@ -43,6 +43,8 @@ import {
 } from "../services/out-of-stock.server";
 
 import { ProductsNeededTable } from "../components/ProductsNeededTable";
+import { purchasingData, purchasingCatalogs } from "../services/purchasing.server";
+import { PurchaseHistory } from "../components/PurchasePlanner";
 import { IncomingProductForm } from "../components/IncomingProductForm";
 import { IncomingProductList } from "../components/IncomingProductList";
 import { DifferenceTable } from "../components/DifferenceTable";
@@ -55,12 +57,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = session.shop;
 
   // Carica in parallelo ordini aggregati e merce in arrivo
-  const [orderData, incomingItems, incomingAggregated, outOfStockProducts] = await Promise.all([
+  const [orderData, incomingItems, incomingAggregated, outOfStockProducts, purchasing] = await Promise.all([
     getAggregatedProducts(admin),
     getIncomingProducts(shop),
     getAggregatedIncoming(shop),
     getOutOfStockProducts(shop),
+    purchasingData(shop),
   ]);
+  const catalogs = await purchasingCatalogs(admin, [...new Set(orderData.products.map(p => p.productId))]);
 
   // Converti la Map in un oggetto serializzabile per il client
   const incomingMap: Record<string, number> = {};
@@ -74,9 +78,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     codAcceptedCount: orderData.codAcceptedCount,
     unconfirmedCodOrders: orderData.unconfirmedCodOrders,
     affectedOrdersMap: orderData.affectedOrdersMap,
-    incomingItems,
+    incomingItems: incomingItems.map(item => {
+      const purchaseId = item.id.startsWith('purchase/') ? item.id.split('/')[1] : '';
+      const purchase = purchasing.purchases.find(p => p.id === purchaseId);
+      return { ...item, supplier: purchase?.supplier, supplierCode: purchase?.supplierCode };
+    }),
     incomingMap,
     outOfStockProducts,
+    purchasing,
+    catalogs,
     lastUpdated: new Date().toISOString(),
   });
 };
@@ -388,7 +398,7 @@ function StatCard({
 
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
-  const { products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
+  const { products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated, purchasing, catalogs } =
     useLoaderData<typeof loader>();
 
   const navigation = useNavigation();
@@ -553,6 +563,9 @@ export default function OrderManagerIndex() {
                 <ProductsNeededTable
                   products={activeProducts}
                   orderCount={orderCount}
+                  incomingMap={incomingMap}
+                  purchasing={purchasing}
+                  catalogs={catalogs}
                 />
               )}
               {selectedTab === 1 && (
@@ -560,6 +573,8 @@ export default function OrderManagerIndex() {
                   <IncomingProductForm products={activeProducts} />
                   <Divider />
                   <IncomingProductList items={incomingItems} />
+                  <Divider />
+                  <PurchaseHistory purchases={purchasing.purchases} />
                 </BlockStack>
               )}
               {selectedTab === 2 && (
