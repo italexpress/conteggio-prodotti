@@ -76,6 +76,9 @@ export function PurchasePlanner({ products, incomingMap, purchasing, catalogs }:
   const payload = active ? {productId:active.productId,colorKey:active.colorKey,supplier,supplierCode:code,notes,packType} : {};
   const submit = (intent:string,data:any) => fetcher.submit({intent,data:JSON.stringify(data)},{method:'post',action:endpoint});
   const plan = active ? planPacks(active.demand,active.incoming,packType,active.hasXXL,active.stock) : null;
+  useEffect(() => {
+    if (active && plan) setPacks(String(plan.packs));
+  }, [active?.key, plan?.packs]);
   const composition = active ? packComposition(packType,active.hasXXL) : {};
   const count = Number(packs);
   const quantities = Object.fromEntries(Object.entries(composition).map(([s,q]) => [s,q*(Number.isSafeInteger(count) ? count : 0)]));
