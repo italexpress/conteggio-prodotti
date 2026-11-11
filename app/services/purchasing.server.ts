@@ -81,6 +81,8 @@ export async function registerPurchase(admin: any, shop: string, data: any) {
   const existing = await db.supplierPurchase.findUnique({ where: { id: data.requestId } });
   if (existing) {
     if (existing.shop !== shop) throw new Error('Richiesta non valida');
+    if (existing.status === 'cancelled') throw new Error('Registrazione gia annullata: aprire un nuovo ordine');
+    if (existing.groupKey !== groupKey(data.productId,data.colorKey) || existing.packs !== Number(data.packs) || existing.packType !== data.packType) throw new Error('Questa richiesta e gia stata registrata con dati diversi. Aggiornare prima di procedere.');
     return existing;
   }
   const packs = Number(data.packs);
