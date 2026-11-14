@@ -14,6 +14,14 @@ model ProductPack {
   @@unique([shop, productId])
 }
 
+model OrderContact {
+  id      String @id @default(cuid())
+  shop    String
+  orderId String
+  phone   String
+  @@unique([shop, orderId])
+}
+
 // Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information

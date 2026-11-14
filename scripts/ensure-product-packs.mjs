@@ -18,6 +18,14 @@ if (process.env.DATABASE_URL) {
       ON "ProductPack"("shop", "productId")`;
     await db.$executeRaw`ALTER TABLE "ProductPack" ADD COLUMN IF NOT EXISTS "ordered" BOOLEAN NOT NULL DEFAULT false`;
     await db.productPack.findFirst();
+    await db.$executeRaw`CREATE TABLE IF NOT EXISTS "OrderContact" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "shop" TEXT NOT NULL,
+      "orderId" TEXT NOT NULL,
+      "phone" TEXT NOT NULL
+    )`;
+    await db.$executeRaw`CREATE UNIQUE INDEX IF NOT EXISTS "OrderContact_shop_orderId_key" ON "OrderContact"("shop", "orderId")`;
+    await db.orderContact.findFirst();
     console.log('ProductPack: struttura e lettura database verificate');
   } finally {
     await db.$disconnect();

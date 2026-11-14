@@ -8,13 +8,16 @@ import {
   Banner,
   EmptyState,
   Button,
+  TextField,
 } from "@shopify/polaris";
 import { useState } from "react";
 import { useFetcher } from "@remix-run/react";
 import type { UnconfirmedCodOrder } from "../services/orders.server";
+import { OrderWhatsApp } from './OrderWhatsApp';
 
 interface UnconfirmedCodListProps {
   orders: UnconfirmedCodOrder[];
+  mode?: 'cod' | 'followup';
 }
 
 function UnconfirmedCodRow({
@@ -22,21 +25,25 @@ function UnconfirmedCodRow({
   index,
   isExpanded,
   onToggleExpanded,
+  mode,
 }: {
   order: UnconfirmedCodOrder;
   index: number;
   isExpanded: boolean;
   onToggleExpanded: () => void;
+  mode: 'cod' | 'followup';
 }) {
   const fetcher = useFetcher();
   const isAccepting = fetcher.state !== "idle";
 
   const orderDate = new Date(order.createdAt).toLocaleDateString("it-IT", {
+    timeZone: 'Europe/Rome',
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
   const orderTime = new Date(order.createdAt).toLocaleTimeString("it-IT", {
+    timeZone: 'Europe/Rome',
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -117,6 +124,11 @@ function UnconfirmedCodRow({
       </IndexTable.Cell>
       <IndexTable.Cell>
         <InlineStack gap="200" blockAlign="center">
+          {mode === 'followup' && <BlockStack gap="100">
+            <Badge tone={order.isCod && !order.codAccepted ? 'warning' : 'info'}>{order.isCod ? (order.codAccepted?'COD accettato':'COD da confermare') : ({PAID:'Pagato',PENDING:'Pagamento in attesa',AUTHORIZED:'Autorizzato',PARTIALLY_PAID:'Parzialmente pagato',PARTIALLY_REFUNDED:'Parzialmente rimborsato'}[order.financialStatus || ''] || order.financialStatus || 'Da verificare')}</Badge>
+            <Text as="span" variant="bodySm">{{UNFULFILLED:'Da evadere',PARTIALLY_FULFILLED:'Parzialmente evaso',ON_HOLD:'In sospeso',SCHEDULED:'Programmato',REQUEST_DECLINED:'Richiesta rifiutata'}[order.fulfillmentStatus || ''] || order.fulfillmentStatus || 'Da evadere'}</Text>
+          </BlockStack>}
+          {mode === 'cod' && <>
           <Badge tone="critical">{"⏳ Da confermare"}</Badge>
           <div onClick={(e) => e.stopPropagation()}>
             <fetcher.Form method="post">
@@ -127,22 +139,27 @@ function UnconfirmedCodRow({
               </Button>
             </fetcher.Form>
           </div>
+          </>}
         </InlineStack>
       </IndexTable.Cell>
+      <IndexTable.Cell><OrderWhatsApp order={order}/></IndexTable.Cell>
     </IndexTable.Row>
   );
 }
 
-export function UnconfirmedCodList({ orders }: UnconfirmedCodListProps) {
+export function UnconfirmedCodList({ orders, mode='cod' }: UnconfirmedCodListProps) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [search,setSearch]=useState('');
+  const sortedOrders=[...orders].sort((a,b)=>new Date(a.createdAt).getTime()-new Date(b.createdAt).getTime());
+  const visibleOrders=sortedOrders.filter(o=>`${o.name} ${o.customerName} ${o.customerPhone || ''}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   if (orders.length === 0) {
     return (
       <EmptyState
-        heading="Tutti i contrassegni sono stati confermati! 🎉"
+        heading={mode==='cod'?'Tutti i contrassegni sono stati confermati! 🎉':'Nessun ordine da evadere'}
         image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
       >
-        <p>Non ci sono ordini in contrassegno in attesa di conferma.</p>
+        <p>{mode==='cod'?'Non ci sono ordini in contrassegno in attesa di conferma.':'Non risultano ordini ancora da evadere.'}</p>
       </EmptyState>
     );
   }
@@ -153,12 +170,13 @@ export function UnconfirmedCodList({ orders }: UnconfirmedCodListProps) {
   );
   const totalItems = orders.reduce((sum, o) => sum + o.itemCount, 0);
 
-  const rowMarkup = orders.map((order, index) => {
+  const rowMarkup = visibleOrders.map((order, index) => {
     const isExpanded = expandedOrderId === order.id;
     return (
       <UnconfirmedCodRow
         key={order.id}
         order={order}
+        mode={mode}
         index={index}
         isExpanded={isExpanded}
         onToggleExpanded={() => setExpandedOrderId(isExpanded ? null : order.id)}
@@ -170,7 +188,7 @@ export function UnconfirmedCodList({ orders }: UnconfirmedCodListProps) {
     <BlockStack gap="400">
       <InlineStack align="space-between" blockAlign="center">
         <Text variant="headingSm" as="h3">
-          Ordini in contrassegno senza conferma
+          {mode==='cod'?'Ordini in contrassegno senza conferma':'Tutti gli ordini da evadere — dal più vecchio al più nuovo'}
         </Text>
         <InlineStack gap="200">
           <Badge tone="critical">{String(orders.length) + " ordini"}</Badge>
@@ -179,17 +197,21 @@ export function UnconfirmedCodList({ orders }: UnconfirmedCodListProps) {
         </InlineStack>
       </InlineStack>
 
-      <Banner tone="warning">
+      {mode==='followup' && <Banner tone="info">Ordini ancora da evadere, anche parziali, in sospeso o programmati. Esclusi annullati e completamente rimborsati. Clicca sulla riga per vedere i prodotti ancora da spedire.</Banner>}
+      {mode==='cod' && <Banner tone="warning">
         <p>
           Questi <strong>{orders.length} ordini</strong> sono in contrassegno
           ma <strong>non hanno il tag "ACCETTATO"</strong> su Shopify.
           Vai su Shopify, apri l'ordine e aggiungi il tag "ACCETTATO" per confermarli.
           Clicca su una riga per vedere i prodotti dell'ordine.
         </p>
-      </Banner>
+      </Banner>}
+      {orders.some(o=>o.contactUnavailable) && <Banner tone="warning">Shopify non rende accessibili alcuni dati di contatto. Puoi aprire l’ordine e inserire qui il numero WhatsApp: verrà salvato anche per le prossime visite.</Banner>}
+      <TextField label="Cerca ordine, cliente o telefono" value={search} onChange={setSearch} autoComplete="off" clearButton onClearButtonClick={()=>setSearch('')}/>
+      {visibleOrders.length===0 && <Text as="p">Nessun ordine corrisponde alla ricerca.</Text>}
 
       <IndexTable
-        itemCount={orders.length}
+        itemCount={visibleOrders.length}
         headings={[
           { title: "Ordine" },
           { title: "Cliente" },
@@ -197,6 +219,7 @@ export function UnconfirmedCodList({ orders }: UnconfirmedCodListProps) {
           { title: "Totale" },
           { title: "Data" },
           { title: "Stato" },
+          { title: "Contatta cliente" },
         ]}
         selectable={false}
       >

@@ -33,6 +33,9 @@ import prisma from "../db.server";
 import { getPackPlan, getPackProduct, getPackCatalogPage } from "../services/packs.server";
 import { PackPlan } from "../components/PackPlan";
 import { getAggregatedProducts } from "../services/orders.server";
+import { getFulfillmentFollowup } from '../services/fulfillment-followup.server';
+import { enrichOrderContacts } from '../services/order-contacts.server';
+import { normalizeContactPhone } from '../services/whatsapp';
 import {
   getIncomingProducts,
   getAggregatedIncoming,
@@ -61,11 +64,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ? await getPackCatalogPage(admin, packParams.get("packCursor")) : null;
 
   // Carica in parallelo ordini aggregati e merce in arrivo
-  const [orderData, incomingItems, incomingAggregated, outOfStockProducts] = await Promise.all([
+  const [orderData, incomingItems, incomingAggregated, outOfStockProducts, followupData] = await Promise.all([
     getAggregatedProducts(admin),
     getIncomingProducts(shop),
     getAggregatedIncoming(shop),
     getOutOfStockProducts(shop),
+    getFulfillmentFollowup(admin),
   ]);
 
   // Converti la Map in un oggetto serializzabile per il client
@@ -74,6 +78,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     incomingMap[key] = value.totalQuantity;
   });
 
+  const contactedOrders=await enrichOrderContacts(admin,shop,[...followupData,...orderData.unconfirmedCodOrders.filter(o=>!followupData.some(f=>f.id===o.id))]);
+  const followupOrders=followupData.map(o=>contactedOrders.find(c=>c.id===o.id)!);
+  const unconfirmedCodOrders=orderData.unconfirmedCodOrders.map(o=>({...o,...contactedOrders.find(c=>c.id===o.id)}));
+
   return json({
     orderedProductIds: (await prisma.productPack.findMany({ where: { shop, ordered: true }, select: { productId: true } })).map(p => p.productId),
     packPlan: await getPackPlan(admin, shop, orderData.products, packCatalog?.ids),
@@ -81,7 +89,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     products: orderData.products,
     orderCount: orderData.orderCount,
     codAcceptedCount: orderData.codAcceptedCount,
-    unconfirmedCodOrders: orderData.unconfirmedCodOrders,
+    unconfirmedCodOrders,
+    followupOrders,
     affectedOrdersMap: orderData.affectedOrdersMap,
     incomingItems,
     incomingMap,
@@ -99,6 +108,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = formData.get("intent") as string;
 
   switch (intent) {
+    case 'saveOrderPhone': {
+      const orderId=String(formData.get('orderId') || '');
+      const phone=normalizeContactPhone(String(formData.get('phone') || ''));
+      if (!/^gid:\/\/shopify\/Order\/\d+$/.test(orderId) || !phone) return json({error:'Inserisci un numero valido con prefisso internazionale, per esempio +39.'},{status:400});
+      const {admin}=await authenticate.admin(request);
+      const response=await admin.graphql(`query ContactOrder($id: ID!) { order(id: $id) { id } }`,{variables:{id:orderId}});
+      const body=await response.json() as any;
+      if (body.errors || !body.data?.order) return json({error:'Ordine non accessibile in questo negozio'},{status:400});
+      await prisma.orderContact.upsert({where:{shop_orderId:{shop,orderId}},create:{shop,orderId,phone},update:{phone}});
+      return json({success:true});
+    }
     case "setPackOrdered": {
       const productId = String(formData.get("productId") || "");
       const value = formData.get("ordered");
@@ -419,7 +439,7 @@ function StatCard({
 
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
-  const { orderedProductIds, packPlan, packCatalog, products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
+  const { followupOrders, orderedProductIds, packPlan, packCatalog, products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
     useLoaderData<typeof loader>();
 
   const navigation = useNavigation();
@@ -483,6 +503,11 @@ export default function OrderManagerIndex() {
       id: "pacchi",
       content: "📦 Composizioni e pacchi interi",
       panelID: "pacchi-panel",
+    },
+    {
+      id: 'ordini-da-evadere',
+      content: `🕒 Ordini da evadere (${followupOrders.length})`,
+      panelID: 'followup-panel',
     },
   ];
 
@@ -609,6 +634,7 @@ export default function OrderManagerIndex() {
                 />
               )}
               {selectedTab === 5 && <PackPlan products={packPlan} catalog={packCatalog} />}
+              {selectedTab === 6 && <UnconfirmedCodList orders={followupOrders} mode="followup"/>}
             </Box>
           </Tabs>
         </Card>

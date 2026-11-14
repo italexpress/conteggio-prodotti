@@ -38,6 +38,7 @@
     "@shopify/shopify-app-session-storage-prisma": "^8.0.0",
     "@vercel/remix": "^2.16.7",
     "isbot": "^5.1.0",
+    "libphonenumber-js": "1.13.16",
     "prisma": "^6.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
