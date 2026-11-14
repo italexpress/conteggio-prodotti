@@ -24,7 +24,7 @@ function ProductPack({ product }: { product: Awaited<ReturnType<typeof getPackPl
       return <BlockStack key={group.name} gap="200">
         {group.name && <Text as="h4" fontWeight="semibold">{group.name}</Text>}
         <Badge tone={plan.count === null ? "attention" : "success"}>{String(plan.count === null ? plan.reason! : `${plan.count} pacchi interi necessari`)}</Badge>
-        {group.variants.map(v => <Text key={v.id} as="p">{v.size || "Taglia non identificata"} · Codice articolo: {v.sku || "Non indicato"} · Da evadere: {v.demand} · Giacenza: {v.stock === null ? "DA CONTARE" : v.stock}</Text>)}
+        {group.variants.map(v => <Text key={v.id} as="p">{v.size || "Taglia non identificata"} · Codice articolo: {v.sku || "Non indicato"} · Da evadere: {v.demand}</Text>)}
       </BlockStack>;
     })}
   </BlockStack></Card>;
@@ -46,7 +46,7 @@ export function PackPlan({ products, catalog }: { products: Awaited<ReturnType<t
       {catalog?.hasNextPage && <Button onClick={() => navigateCatalog(true, catalog.endCursor)}>Prodotti successivi</Button>}
     </InlineStack>
     {catalog && <Text as="p">Pagina del catalogo Shopify, fino a 20 prodotti. Puoi salvare la composizione anche prima di ricevere ordini.</Text>}
-    <Text as="p">Scorte fisiche Shopify (on hand), merce in arrivo esclusa. Le giacenze non note richiedono un conteggio. Ogni colore viene calcolato separatamente.</Text>
+    <Text as="p">Pacchi calcolati sulle quantità da evadere, senza sottrarre giacenze o merce in arrivo. Ogni colore viene calcolato separatamente.</Text>
     {products.map(p => <ProductPack key={p.id} product={p} />)}
   </BlockStack>;
 }

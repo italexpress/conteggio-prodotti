@@ -1,7 +1,7 @@
 import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
 import prisma from "../db.server";
 import type { AggregatedProduct } from "./orders.server";
-import { compatibleCompositions, normalizeSize, inventoryAccessDenied, type PackVariant } from "./packs";
+import { compatibleCompositions, normalizeSize, type PackVariant } from "./packs";
 
 export const PACK_PRODUCT_QUERY = `query PackProduct($id: ID!, $cursor: String) {
   product(id: $id) {
@@ -9,42 +9,18 @@ export const PACK_PRODUCT_QUERY = `query PackProduct($id: ID!, $cursor: String) 
     variants(first: 20, after: $cursor) {
       nodes {
         id sku selectedOptions { name value }
-        inventoryItem { tracked inventoryLevels(first: 10) {
-          nodes { quantities(names: ["on_hand"]) { name quantity } }
-          pageInfo { hasNextPage }
-        } }
       }
       pageInfo { hasNextPage endCursor }
     }
   }
 }`;
 
-export const PACK_METADATA_QUERY = `query PackMetadata($id: ID!, $cursor: String) {
-  product(id: $id) {
-    id title vendor
-    variants(first: 20, after: $cursor) {
-      nodes { id sku selectedOptions { name value } }
-      pageInfo { hasNextPage endCursor }
-    }
-  }
-}`;
-const inventoryUnavailable = new WeakSet<object>();
-
 async function readPackPage(admin: AdminApiContext, id: string, cursor: string | null) {
-  const read = async (query: string) => {
-    const response = await admin.graphql(query, { variables: { id, cursor } });
+    const response = await admin.graphql(PACK_PRODUCT_QUERY, { variables: { id, cursor } });
     const body = await response.json() as any;
     if (body.errors) throw Object.assign(new Error('Errore query prodotto Shopify'), { errors: body.errors });
     if (!body.data?.product) throw new Error('Prodotto Shopify non disponibile');
     return body;
-  };
-  if (inventoryUnavailable.has(admin)) return read(PACK_METADATA_QUERY);
-  try { return await read(PACK_PRODUCT_QUERY); }
-  catch (error) {
-    if (!inventoryAccessDenied(error)) throw error;
-    inventoryUnavailable.add(admin);
-    return read(PACK_METADATA_QUERY);
-  }
 }
 
 export const PACK_CATALOG_QUERY = `query PackCatalog($cursor: String) {
@@ -73,11 +49,7 @@ export async function getPackProduct(admin: AdminApiContext, productId: string, 
     for (const v of product.variants.nodes) {
       const sizeOption = v.selectedOptions.find((o: any) => /^(size|taglia|taglie|taille|talla|größe)$/i.test(o.name));
       const group = v.selectedOptions.filter((o: any) => o !== sizeOption).map((o: any) => `${o.name}: ${o.value}`).join(" / ");
-      const levels = v.inventoryItem?.inventoryLevels;
-      const quantities = levels?.nodes.map((l: any) => l.quantities.find((q: any) => q.name === "on_hand")?.quantity);
-      const known = v.inventoryItem?.tracked && !levels?.pageInfo.hasNextPage && quantities?.length > 0 && quantities.every((q: any) => Number.isFinite(q));
       variants.push({ id: v.id, sku: v.sku || "", size: normalizeSize(sizeOption?.value || ""), group,
-        stock: known ? quantities.reduce((sum: number, n: number) => sum + n, 0) : null,
         demand: orders.find(o => o.variantId === v.id)?.packQuantity || 0 });
     }
     cursor = product.variants.pageInfo.hasNextPage ? product.variants.pageInfo.endCursor : null;

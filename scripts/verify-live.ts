@@ -12,9 +12,7 @@ try {
     const { admin } = await unauthenticated.admin(shop);
     const orders = await getAggregatedProducts(admin);
     const products = await getPackPlan(admin, shop, orders.products);
-    let unknown = 0;
     for (const product of products) for (const group of product.groups) {
-      unknown += group.variants.filter(v => v.stock === null).length;
       for (const composition of product.options) {
         const plan = minimumPacks(group.variants, composition);
         assert(plan.count === null || (Number.isInteger(plan.count) && plan.count >= 0));
@@ -32,6 +30,6 @@ try {
         throw rollback;
       });
     } catch (error) { if (error !== rollback) throw error; }
-    console.log(`Verifica reale completata: ${orders.orderCount} ordini, ${products.length} prodotti, ${unknown} giacenze DA CONTARE; salvataggio verificato con rollback.`);
+    console.log(`Verifica reale completata: ${orders.orderCount} ordini, ${products.length} prodotti; calcolo senza giacenze e salvataggio verificati.`);
   }
 } finally { await prisma.$disconnect(); }
