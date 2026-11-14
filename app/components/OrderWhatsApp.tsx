@@ -13,8 +13,8 @@ export function OrderWhatsApp({order}:{order:UnconfirmedCodOrder}) {
   const url=whatsappLink(order.customerPhone,order.name);
   return <div onClick={event=>event.stopPropagation()}><BlockStack gap="200">
     <InlineStack gap="200">
-      {url && <Button url={url} external tone="success">WhatsApp</Button>}
-      {order.shopifyUrl && <Button url={order.shopifyUrl} external>Apri ordine</Button>}
+      {url && <Button url={url} target="_blank" external tone="success">WhatsApp</Button>}
+      {order.shopifyUrl && <Button url={order.shopifyUrl} target="_blank" external>Apri ordine</Button>}
       <Button variant="plain" onClick={()=>setEditing(!editing)}>{url?'Modifica numero':'Inserisci numero WhatsApp'}</Button>
     </InlineStack>
     {!url && <Text as="p" variant="bodySm" tone="subdued">{order.contactUnavailable?'Telefono non accessibile da Shopify':'Numero di telefono non disponibile'}</Text>}
