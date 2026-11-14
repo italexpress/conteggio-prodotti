@@ -30,7 +30,7 @@ import { useState, useMemo } from "react";
 
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { getPackPlan, getPackProduct } from "../services/packs.server";
+import { getPackPlan, getPackProduct, getPackCatalogPage } from "../services/packs.server";
 import { PackPlan } from "../components/PackPlan";
 import { getAggregatedProducts } from "../services/orders.server";
 import {
@@ -56,6 +56,9 @@ import { TerminatedProductsList } from "../components/TerminatedProductsList";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shop = session.shop;
+  const packParams = new URL(request.url).searchParams;
+  const packCatalog = packParams.get("packCatalog") === "1"
+    ? await getPackCatalogPage(admin, packParams.get("packCursor")) : null;
 
   // Carica in parallelo ordini aggregati e merce in arrivo
   const [orderData, incomingItems, incomingAggregated, outOfStockProducts] = await Promise.all([
@@ -72,7 +75,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   return json({
-    packPlan: await getPackPlan(admin, shop, orderData.products),
+    packPlan: await getPackPlan(admin, shop, orderData.products, packCatalog?.ids),
+    packCatalog,
     products: orderData.products,
     orderCount: orderData.orderCount,
     codAcceptedCount: orderData.codAcceptedCount,
@@ -402,7 +406,7 @@ function StatCard({
 
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
-  const { packPlan, products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
+  const { packPlan, packCatalog, products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
     useLoaderData<typeof loader>();
 
   const navigation = useNavigation();
@@ -484,7 +488,7 @@ export default function OrderManagerIndex() {
       }
     >
       <BlockStack gap="600">
-        <PackPlan products={packPlan} />
+        <PackPlan products={packPlan} catalog={packCatalog} />
         {/* DASHBOARD STATISTICHE */}
         <Layout>
           <Layout.Section variant="oneHalf">

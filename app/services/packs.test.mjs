@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { compatibleCompositions, minimumPacks, normalizeSize } from './packs.ts';
+import { compatibleCompositions, minimumPacks, normalizeSize, inventoryAccessDenied } from './packs.ts';
 const variant = (size, demand, stock) => ({ id: size, size, demand, stock, group: '', sku: size });
 
 test('only real Shopify sizes enable a composition, XXL is conditional', () => {
@@ -32,4 +32,12 @@ test('colors require independent packs, stock cannot cross colors', () => {
   const red = minimumPacks([variant('M',5,0)],'S/M/M/L/L/XL');
   const blue = minimumPacks([variant('M',2,20)],'S/M/M/L/L/XL');
   assert.equal(red.count + blue.count,3);
+});
+test('only inventory permission denials permit unknown-stock fallback', () => {
+  const denial = { extensions:{code:'ACCESS_DENIED'},path:['product','variants','nodes',0,'inventoryItem','inventoryLevels'] };
+  assert(inventoryAccessDenied({body:{errors:{graphQLErrors:[denial]}}}));
+  assert(inventoryAccessDenied({errors:[denial]}));
+  assert.equal(inventoryAccessDenied({errors:[{extensions:{code:'ACCESS_DENIED'},path:['product']}]}),false);
+  assert.equal(inventoryAccessDenied({errors:[{extensions:{code:'THROTTLED'},path:['inventoryLevels']}]}),false);
+  assert.equal(inventoryAccessDenied(new Error('network')),false);
 });

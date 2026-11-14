@@ -1,5 +1,5 @@
-import { useFetcher } from "@remix-run/react";
-import { Badge, BlockStack, Card, Select, Text, Banner } from "@shopify/polaris";
+import { useFetcher, useSearchParams } from "@remix-run/react";
+import { Badge, BlockStack, Card, Select, Text, Banner, Button, InlineStack } from "@shopify/polaris";
 import type { getPackPlan } from "../services/packs.server";
 import { minimumPacks } from "../services/packs";
 
@@ -30,9 +30,22 @@ function ProductPack({ product }: { product: Awaited<ReturnType<typeof getPackPl
   </BlockStack></Card>;
 }
 
-export function PackPlan({ products }: { products: Awaited<ReturnType<typeof getPackPlan>> }) {
+export function PackPlan({ products, catalog }: { products: Awaited<ReturnType<typeof getPackPlan>>; catalog: { hasNextPage: boolean; endCursor: string | null } | null }) {
+  const [params, setParams] = useSearchParams();
+  const navigateCatalog = (enabled: boolean, cursor?: string | null) => {
+    const next = new URLSearchParams(params);
+    if (enabled) next.set('packCatalog', '1'); else next.delete('packCatalog');
+    if (cursor) next.set('packCursor', cursor); else next.delete('packCursor');
+    setParams(next);
+  };
   return <BlockStack gap="400">
     <Text as="h2" variant="headingMd">Pacchi per ordini PAGATI e contrassegni ACCETTATI</Text>
+    <InlineStack gap="200">
+      <Button pressed={!catalog} onClick={() => navigateCatalog(false)}>Prodotti degli ordini</Button>
+      <Button pressed={Boolean(catalog)} onClick={() => navigateCatalog(true)}>Tutti i prodotti Shopify</Button>
+      {catalog?.hasNextPage && <Button onClick={() => navigateCatalog(true, catalog.endCursor)}>Prodotti successivi</Button>}
+    </InlineStack>
+    {catalog && <Text as="p">Pagina del catalogo Shopify, fino a 20 prodotti. Puoi salvare la composizione anche prima di ricevere ordini.</Text>}
     <Text as="p">Scorte fisiche Shopify (on hand), merce in arrivo esclusa. Le giacenze non note richiedono un conteggio. Ogni colore viene calcolato separatamente.</Text>
     {products.map(p => <ProductPack key={p.id} product={p} />)}
   </BlockStack>;
