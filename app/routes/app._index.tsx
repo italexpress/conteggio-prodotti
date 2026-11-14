@@ -466,6 +466,11 @@ export default function OrderManagerIndex() {
       content: `🚫 Terminati (${outOfStockProducts.length})`,
       panelID: "terminati-panel",
     },
+    {
+      id: "pacchi",
+      content: "📦 Composizioni e pacchi interi",
+      panelID: "pacchi-panel",
+    },
   ];
 
   const outOfStockVariantIds = outOfStockProducts.map(p => p.variantId);
@@ -488,7 +493,6 @@ export default function OrderManagerIndex() {
       }
     >
       <BlockStack gap="600">
-        <PackPlan products={packPlan} catalog={packCatalog} />
         {/* DASHBOARD STATISTICHE */}
         <Layout>
           <Layout.Section variant="oneHalf">
@@ -591,6 +595,7 @@ export default function OrderManagerIndex() {
                   affectedOrdersMap={affectedOrdersMap}
                 />
               )}
+              {selectedTab === 5 && <PackPlan products={packPlan} catalog={packCatalog} />}
             </Box>
           </Tabs>
         </Card>
