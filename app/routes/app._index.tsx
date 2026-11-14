@@ -78,9 +78,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     incomingMap[key] = value.totalQuantity;
   });
 
-  const contactedOrders=await enrichOrderContacts(admin,shop,[...followupData,...orderData.unconfirmedCodOrders.filter(o=>!followupData.some(f=>f.id===o.id))]);
-  const followupOrders=followupData.map(o=>contactedOrders.find(c=>c.id===o.id)!);
-  const unconfirmedCodOrders=orderData.unconfirmedCodOrders.map(o=>({...o,...contactedOrders.find(c=>c.id===o.id)}));
+  const contactedOrders=await enrichOrderContacts(admin,shop,[...followupData,...orderData.unconfirmedCodOrders]);
+  const followupOrders=contactedOrders.slice(0,followupData.length);
+  const unconfirmedCodOrders=contactedOrders.slice(followupData.length);
 
   return json({
     orderedProductIds: (await prisma.productPack.findMany({ where: { shop, ordered: true }, select: { productId: true } })).map(p => p.productId),
