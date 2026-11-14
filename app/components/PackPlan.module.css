@@ -1,0 +1,23 @@
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.search { flex: 1 1 240px; min-width: 200px; }
+.tableWrap { overflow-x: auto; border: 1px solid #d8dadd; border-radius: 6px; }
+.table { width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: 13px; }
+.table thead th { padding: 7px 12px; color: #61666b; background: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.productHeading th { padding: 7px 12px; background: #f1f2f3; border-top: 1px solid #cbd0d4; }
+.headingLine { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; }
+.identity { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.title { font-weight: 700; font-size: 14px; }
+.code { color: #555b61; font-weight: 400; font-size: 12px; }
+.controls { display: flex; align-items: center; gap: 12px; }
+.composition { min-width: 180px; }
+.table td { padding: 5px 12px; border-top: 1px solid #edf0f2; vertical-align: top; }
+.color { width: 24%; min-width: 110px; }
+.packs { width: 18%; min-width: 130px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.remaining { width: 18%; min-width: 110px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sold { min-width: 190px; }
+.soldSizes { display: flex; flex-wrap: wrap; gap: 4px 14px; font-variant-numeric: tabular-nums; }
+.muted { color: #747a80; }
+.warning { color: #8a5a00; font-weight: 400; white-space: normal; }
+.error { color: #b42318; font-size: 12px; font-weight: 400; }
+.hint { color: #61666b; font-size: 12px; margin: 0; }
+@media (max-width: 640px) { .table { min-width: 610px; } .controls { gap: 8px; } }

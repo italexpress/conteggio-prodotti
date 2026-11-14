@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { compatibleCompositions, minimumPacks, normalizeSize } from './packs.ts';
+import { compatibleCompositions, minimumPacks, normalizeSize, summarizePacks } from './packs.ts';
 const variant = (size, demand, stock) => ({ id: size, size, demand, stock, group: '', sku: size });
 test('only real Shopify sizes enable compositions and XXL is conditional', () => {
   assert.deepEqual(compatibleCompositions(['S','M','L','XL']), ['S/M/L/XL','S/M/M/L/L/XL']);
@@ -29,4 +29,13 @@ test('colors require independent packs', () => {
   const red = minimumPacks([variant('M',5,null)],'S/M/M/L/L/XL');
   const blue = minimumPacks([variant('M',2,100)],'S/M/M/L/L/XL');
   assert.equal(red.count+blue.count,4);
+});
+test('remaining pieces are the excess from whole packs, never warehouse stock',()=>{
+ const rows=[variant('S',3,999),variant('M',7,999),variant('L',4,999),variant('XL',2,999)];
+ const plan=summarizePacks(rows,'S/M/M/L/L/XL');
+ assert.equal(plan.count,4);
+ assert.equal(plan.remaining,8); // 4 packs * 6 pieces - 16 sold
+ assert.deepEqual(plan.sold,{S:3,M:7,L:4,XL:2});
+ assert.equal(summarizePacks([variant('S',0,null)],'S/M/L/XL').remaining,0);
+ assert.equal(summarizePacks(rows,'').remaining,null);
 });

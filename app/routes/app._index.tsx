@@ -6,27 +6,19 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
-  Layout,
   BlockStack,
   Button,
   InlineStack,
   Card,
   Text,
   Badge,
-  Icon,
   Box,
   Divider,
   Tabs,
   ProgressBar,
 } from "@shopify/polaris";
-import {
-  RefreshIcon,
-  OrderIcon,
-  ProductIcon,
-  DeliveryIcon,
-  CheckCircleIcon,
-} from "@shopify/polaris-icons";
-import { useState, useMemo } from "react";
+import { RefreshIcon } from "@shopify/polaris-icons";
+import { useState } from "react";
 
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -380,63 +372,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 };
 
-// --- Componente Stat Card ---
-function StatCard({
-  title,
-  value,
-  icon,
-  tone,
-  subtitle,
-}: {
-  title: string;
-  value: string | number;
-  icon: any;
-  tone?: "success" | "critical" | "warning" | "info" | "magic";
-  subtitle?: string;
-}) {
-  const toneColors: Record<string, string> = {
-    success: "#22c55e",
-    critical: "#ef4444",
-    warning: "#f59e0b",
-    info: "#3b82f6",
-    magic: "#8b5cf6",
-  };
-  const color = toneColors[tone || "info"];
-
-  return (
-    <Card>
-      <BlockStack gap="300">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text variant="bodySm" as="span" tone="subdued">
-            {title}
-          </Text>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              background: `${color}15`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon source={icon} tone={tone === "info" ? "info" : tone === "success" ? "success" : tone === "critical" ? "critical" : "base"} />
-          </div>
-        </InlineStack>
-        <Text variant="heading2xl" as="p" fontWeight="bold">
-          {value}
-        </Text>
-        {subtitle && (
-          <Text variant="bodySm" as="span" tone="subdued">
-            {subtitle}
-          </Text>
-        )}
-      </BlockStack>
-    </Card>
-  );
-}
-
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
   const { followupOrders, orderedProductIds, packPlan, packCatalog, products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
@@ -445,7 +380,7 @@ export default function OrderManagerIndex() {
   const navigation = useNavigation();
   const isRefreshing = navigation.state === "loading";
 
-  const [selectedTab, setSelectedTab] = useState(0);
+  const [selectedTab, setSelectedTab] = useState(5);
 
   const formattedLastUpdated = new Date(lastUpdated).toLocaleTimeString(
     "it-IT",
@@ -460,7 +395,6 @@ export default function OrderManagerIndex() {
   const totalItems = products.reduce((sum, p) => sum + p.totalQuantity, 0);
   const totalCod = products.reduce((sum, p) => sum + p.codQuantity, 0);
   const totalCodAccepted = products.reduce((sum, p) => sum + p.codAcceptedQuantity, 0);
-  const totalIncoming = Object.values(incomingMap).reduce((sum, q) => sum + q, 0);
 
   // Calcola copertura
   const coveredProducts = products.filter((p) => {
@@ -501,7 +435,7 @@ export default function OrderManagerIndex() {
     },
     {
       id: "pacchi",
-      content: "📦 Composizioni e pacchi interi",
+      content: "📦 Lista acquisti",
       panelID: "pacchi-panel",
     },
     {
@@ -515,8 +449,7 @@ export default function OrderManagerIndex() {
   const activeProducts = products.filter(p => !outOfStockVariantIds.includes(p.variantId));
 
   return (
-    <Page
-      title="Conteggio Prodotti"
+    <Page fullWidth title="Conteggio Prodotti"
       subtitle={`Ultimo aggiornamento: ${formattedLastUpdated}`}
       primaryAction={
         <Button
@@ -530,49 +463,16 @@ export default function OrderManagerIndex() {
         </Button>
       }
     >
-      <BlockStack gap="600">
-        {/* DASHBOARD STATISTICHE */}
-        <Layout>
-          <Layout.Section variant="oneHalf">
-            <StatCard
-              title="Ordini aperti"
-              value={orderCount}
-              icon={OrderIcon}
-              tone="info"
-              subtitle="Da evadere"
-            />
-          </Layout.Section>
-          <Layout.Section variant="oneHalf">
-            <StatCard
-              title="Pezzi totali"
-              value={totalItems}
-              icon={ProductIcon}
-              tone="magic"
-              subtitle={`${products.length} prodotti diversi`}
-            />
-          </Layout.Section>
-          <Layout.Section variant="oneHalf">
-            <StatCard
-              title="In contrassegno"
-              value={totalCod}
-              icon={DeliveryIcon}
-              tone="warning"
-              subtitle={`${totalCodAccepted} pz accettati su ${totalCod}`}
-            />
-          </Layout.Section>
-          <Layout.Section variant="oneHalf">
-            <StatCard
-              title="COD Accettati ✅"
-              value={totalCodAccepted}
-              icon={CheckCircleIcon}
-              tone="success"
-              subtitle={`${codAcceptedCount} ordini con tag ACCETTATO`}
-            />
-          </Layout.Section>
-        </Layout>
+      <BlockStack gap="300">
+        <InlineStack gap="300" blockAlign="center">
+          <Badge>{`${orderCount} ordini aperti`}</Badge>
+          <Badge>{`${totalItems} pezzi · ${products.length} varianti`}</Badge>
+          <Badge tone="warning">{`${totalCod} pezzi in contrassegno`}</Badge>
+          <Badge tone="success">{`${totalCodAccepted} pezzi COD accettati · ${codAcceptedCount} ordini`}</Badge>
+        </InlineStack>
 
         {/* BARRA DI COPERTURA */}
-        {productsWithNeeds > 0 && Object.keys(incomingMap).length > 0 && (
+        {selectedTab === 2 && productsWithNeeds > 0 && Object.keys(incomingMap).length > 0 && (
           <Card>
             <BlockStack gap="300">
               <InlineStack align="space-between" blockAlign="center">

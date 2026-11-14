@@ -184,7 +184,7 @@ export function ProductsNeededTable({
         heading="Nessun prodotto in questa lista"
         image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
       >
-        <p>I prodotti già ordinati sono consultabili in Composizioni e pacchi interi → Ordinati.</p>
+        <p>I prodotti già ordinati sono consultabili in Lista acquisti → Ordinati.</p>
       </EmptyState>
     );
   }

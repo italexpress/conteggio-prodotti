@@ -22,3 +22,12 @@ export function minimumPacks(variants: PackVariant[], composition: string): { co
   }
   return { count, reason: null };
 }
+
+export function summarizePacks(variants: PackVariant[], composition: string) {
+  const plan = minimumPacks(variants, composition);
+  const sold: Record<string, number> = {};
+  for (const variant of variants) if (variant.demand > 0) sold[variant.size || '?'] = (sold[variant.size || '?'] || 0) + variant.demand;
+  const piecesPerPack = Object.values(COMPOSITIONS[composition] || {}).reduce((sum, quantity) => sum + quantity, 0);
+  const totalSold = Object.values(sold).reduce((sum, quantity) => sum + quantity, 0);
+  return { ...plan, sold, remaining: plan.count === null ? null : plan.count * piecesPerPack - totalSold };
+}
