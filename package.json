@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@11.25.0",
   "scripts": {
-    "build": "node scripts/ensure-product-packs.mjs && node scripts/verify-live.mjs && remix vite:build",
+    "build": "prisma generate && node scripts/ensure-product-packs.mjs && node scripts/verify-live.mjs && remix vite:build",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
