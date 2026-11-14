@@ -15,6 +15,7 @@ export interface AggregatedProduct {
 
 // Tipo per un ordine COD non confermato
 export interface UnconfirmedCodOrder {
+  customerFirstName?: string | null;
   customerPhone?: string | null;
   contactUnavailable?: boolean;
   shopifyUrl?: string;

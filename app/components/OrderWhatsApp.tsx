@@ -10,7 +10,7 @@ export function OrderWhatsApp({order}:{order:UnconfirmedCodOrder}) {
   const [phone,setPhone]=useState(order.customerPhone || '');
   useEffect(()=>setPhone(order.customerPhone || ''),[order.customerPhone]);
   useEffect(()=>{if(fetcher.state==='idle' && fetcher.data?.success)setEditing(false)},[fetcher.state,fetcher.data]);
-  const url=whatsappLink(order.customerPhone,order.name);
+  const url=whatsappLink(order.customerPhone,order.customerFirstName || order.customerName);
   return <div onClick={event=>event.stopPropagation()}><BlockStack gap="200">
     <InlineStack gap="200">
       {url && <Button url={url} target="_blank" external tone="success">WhatsApp</Button>}

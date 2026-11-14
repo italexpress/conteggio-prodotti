@@ -10,9 +10,12 @@ export function normalizeContactPhone(raw: string | null | undefined, country?: 
     return phone?.isValid() && !phone.ext ? phone.number : null;
   } catch { return null; }
 }
-export function whatsappLink(phone: string | null | undefined, orderName: string): string | null {
+export function whatsappLink(phone: string | null | undefined, customerName?: string | null): string | null {
   const normalized=normalizeContactPhone(phone);
-  return normalized ? `https://wa.me/${normalized.slice(1)}?text=${encodeURIComponent(`Buongiorno, ti contattiamo per il tuo ordine ${orderName}.`)}` : null;
+  const name=customerName?.trim().replace(/\s+/g,' ') || '';
+  const greeting=name && !/^cliente$/i.test(name) ? `Ciao ${name}!` : 'Ciao!';
+  const message=`${greeting} Perdonaci per il disturbo, ti scriviamo in merito al tuo ordine 📦`;
+  return normalized ? `https://wa.me/${normalized.slice(1)}?text=${encodeURIComponent(message)}` : null;
 }
 export function contactAccessDenied(error: any): boolean {
   const errors=error?.body?.errors?.graphQLErrors ?? error?.errors;

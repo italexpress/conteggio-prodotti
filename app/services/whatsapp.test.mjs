@@ -9,11 +9,14 @@ test('international and national numbers use the actual country, never an assume
  assert.equal(normalizeContactPhone('invalid'),null);
  assert.equal(normalizeContactPhone('+39 333 1234567 ext 20'),null);
 });
-test('WhatsApp links use normalized digits and encode the exact order reference',()=>{
- const link=whatsappLink('+39 333 1234567','#1234');
+test('WhatsApp links use the requested greeting with customer name and parcel emoji',()=>{
+ const link=whatsappLink('+39 333 1234567','Maria Grazia');
  assert(link.startsWith('https://wa.me/393331234567?text='));
- assert(new URL(link).searchParams.get('text').includes('#1234'));
- assert.equal(whatsappLink(null,'#1234'),null);
+ assert.equal(new URL(link).searchParams.get('text'),'Ciao Maria Grazia! Perdonaci per il disturbo, ti scriviamo in merito al tuo ordine 📦');
+ assert.equal(whatsappLink(null,'Maria'),null);
+});
+test('missing names and the generic customer placeholder use Ciao without an invented name',()=>{
+ for(const name of [undefined,null,'','  ','Cliente'])assert(new URL(whatsappLink('+393331234567',name)).searchParams.get('text').startsWith('Ciao! Perdonaci'));
 });
 test('only contact permission denials permit unavailable-contact fallback',()=>{
  assert(contactAccessDenied({body:{errors:{graphQLErrors:[{extensions:{code:'ACCESS_DENIED'},path:['nodes',0,'shippingAddress']}]}}}));

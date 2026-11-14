@@ -7,7 +7,7 @@ export const ORDER_CONTACTS_QUERY = `query OrderContacts($ids: [ID!]!) {
   nodes(ids: $ids) {
     ... on Order {
       id phone
-      shippingAddress { name phone city province countryCodeV2 }
+      shippingAddress { firstName name phone city province countryCodeV2 }
       billingAddress { phone countryCodeV2 }
     }
   }
@@ -42,7 +42,7 @@ export async function enrichOrderContacts(admin: AdminApiContext, shop: string, 
       normalizeContactPhone(shipping?.phone,shipping?.countryCodeV2) ||
       normalizeContactPhone(contact?.phone,shipping?.countryCodeV2 || billing?.countryCodeV2) ||
       normalizeContactPhone(billing?.phone,billing?.countryCodeV2);
-    return {...row,customerName:shipping?.name || row.customerName,shippingCity:shipping?.city || row.shippingCity,
+    return {...row,customerFirstName:shipping?.firstName || null,customerName:shipping?.name || row.customerName,shippingCity:shipping?.city || row.shippingCity,
       shippingProvince:shipping?.province || row.shippingProvince,customerPhone:phone,contactUnavailable:unavailable,
       shopifyUrl:`https://${shop}/admin/orders/${row.id.split('/').pop()}`};
   });

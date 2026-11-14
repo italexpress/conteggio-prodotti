@@ -19,7 +19,7 @@ try {
     const contacted=await enrichOrderContacts(admin,shop,followup);
     assert.equal(contacted.length,followup.length);
     for(let i=1;i<followup.length;i++) assert(followup[i-1].createdAt<=followup[i].createdAt);
-    for(const row of contacted) if(row.customerPhone) assert(whatsappLink(row.customerPhone,row.name));
+    for(const row of contacted) if(row.customerPhone) assert(whatsappLink(row.customerPhone,row.customerFirstName || row.customerName));
     for (const product of products) for (const group of product.groups) {
       for (const composition of product.options) {
         const plan = minimumPacks(group.variants, composition);
