@@ -75,6 +75,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   return json({
+    orderedProductIds: (await prisma.productPack.findMany({ where: { shop, ordered: true }, select: { productId: true } })).map(p => p.productId),
     packPlan: await getPackPlan(admin, shop, orderData.products, packCatalog?.ids),
     packCatalog,
     products: orderData.products,
@@ -98,6 +99,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = formData.get("intent") as string;
 
   switch (intent) {
+    case "setPackOrdered": {
+      const productId = String(formData.get("productId") || "");
+      const value = formData.get("ordered");
+      if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId) || (value !== "true" && value !== "false")) {
+        return json({ error: "Stato prodotto non valido" }, { status: 400 });
+      }
+      const { admin } = await authenticate.admin(request);
+      await getPackProduct(admin, productId);
+      const ordered = value === "true";
+      await prisma.productPack.upsert({ where: { shop_productId: { shop, productId } }, create: { shop, productId, composition: "", ordered }, update: { ordered } });
+      return json({ success: true });
+    }
     case "savePack": {
       const productId = String(formData.get("productId") || "");
       const composition = String(formData.get("composition") || "");
@@ -406,7 +419,7 @@ function StatCard({
 
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
-  const { packPlan, packCatalog, products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
+  const { orderedProductIds, packPlan, packCatalog, products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
     useLoaderData<typeof loader>();
 
   const navigation = useNavigation();
@@ -572,7 +585,7 @@ export default function OrderManagerIndex() {
             <Box padding="400">
               {selectedTab === 0 && (
                 <ProductsNeededTable
-                  products={activeProducts}
+                  products={activeProducts.filter(p => !orderedProductIds.includes(p.productId))}
                   orderCount={orderCount}
                 />
               )}

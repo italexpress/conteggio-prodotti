@@ -10,6 +10,7 @@ model ProductPack {
   shop        String
   productId   String
   composition String
+  ordered     Boolean @default(false)
   @@unique([shop, productId])
 }
 

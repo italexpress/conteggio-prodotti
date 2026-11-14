@@ -1,5 +1,6 @@
 import { useFetcher, useSearchParams } from "@remix-run/react";
-import { Badge, BlockStack, Card, Select, Text, Banner, Button, InlineStack } from "@shopify/polaris";
+import { Badge, BlockStack, Card, Select, Text, Banner, Button, InlineStack, Checkbox } from "@shopify/polaris";
+import { useState } from "react";
 import type { getPackPlan } from "../services/packs.server";
 import { minimumPacks } from "../services/packs";
 
@@ -11,6 +12,9 @@ function ProductPack({ product }: { product: Awaited<ReturnType<typeof getPackPl
   return <Card><BlockStack gap="300">
     <Text as="h3" variant="headingSm">{product.title}</Text>
     <Text as="p">Fornitore: {product.vendor || "Non indicato"}</Text>
+    <Checkbox label="Ordinato" helpText={product.ordered ? "Togli la spunta per rimettere il prodotto nella lista da ordinare." : "Spunta dopo aver ordinato il prodotto: verrà spostato in Ordinati."}
+      checked={product.ordered} disabled={fetcher.state !== "idle"}
+      onChange={ordered => fetcher.submit({ intent: "setPackOrdered", productId: product.id, ordered: String(ordered) }, { method: "post" })} />
     {total !== null && <Text as="p" fontWeight="bold">Totale prodotto: {total} pacchi interi</Text>}
     <Select label="Composizione del pacco" value={selected}
       disabled={fetcher.state !== "idle" || product.options.length === 0}
@@ -32,6 +36,8 @@ function ProductPack({ product }: { product: Awaited<ReturnType<typeof getPackPl
 
 export function PackPlan({ products, catalog }: { products: Awaited<ReturnType<typeof getPackPlan>>; catalog: { hasNextPage: boolean; endCursor: string | null } | null }) {
   const [params, setParams] = useSearchParams();
+  const [showOrdered, setShowOrdered] = useState(false);
+  const visibleProducts = products.filter(p => p.ordered === showOrdered);
   const navigateCatalog = (enabled: boolean, cursor?: string | null) => {
     const next = new URLSearchParams(params);
     if (enabled) next.set('packCatalog', '1'); else next.delete('packCatalog');
@@ -45,8 +51,13 @@ export function PackPlan({ products, catalog }: { products: Awaited<ReturnType<t
       <Button pressed={Boolean(catalog)} onClick={() => navigateCatalog(true)}>Tutti i prodotti Shopify</Button>
       {catalog?.hasNextPage && <Button onClick={() => navigateCatalog(true, catalog.endCursor)}>Prodotti successivi</Button>}
     </InlineStack>
+    <InlineStack gap="200">
+      <Button pressed={!showOrdered} onClick={() => setShowOrdered(false)}>{`Da ordinare (${products.filter(p => !p.ordered).length})`}</Button>
+      <Button pressed={showOrdered} onClick={() => setShowOrdered(true)}>{`Ordinati (${products.filter(p => p.ordered).length})`}</Button>
+    </InlineStack>
     {catalog && <Text as="p">Pagina del catalogo Shopify, fino a 20 prodotti. Puoi salvare la composizione anche prima di ricevere ordini.</Text>}
     <Text as="p">Pacchi calcolati sulle quantità da evadere, senza sottrarre giacenze o merce in arrivo. Ogni colore viene calcolato separatamente.</Text>
-    {products.map(p => <ProductPack key={p.id} product={p} />)}
+    {visibleProducts.length === 0 && <Text as="p">{showOrdered ? "Nessun prodotto segnato come ordinato in questa lista." : "Nessun prodotto da ordinare in questa lista."}</Text>}
+    {visibleProducts.map(p => <ProductPack key={p.id} product={p} />)}
   </BlockStack>;
 }

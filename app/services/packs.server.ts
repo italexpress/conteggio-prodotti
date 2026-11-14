@@ -72,14 +72,15 @@ export async function getPackProduct(admin: AdminApiContext, productId: string, 
 export async function getPackPlan(admin: AdminApiContext, shop: string, orders: AggregatedProduct[], productIds?: string[]) {
   const settings = await prisma.productPack.findMany({ where: { shop } });
   const ids = [...new Set(productIds ?? orders.map(o => o.productId))];
-  const result: Array<Awaited<ReturnType<typeof getPackProduct>> & { selected: string }> = new Array(ids.length);
+  const result: Array<Awaited<ReturnType<typeof getPackProduct>> & { selected: string; ordered: boolean }> = new Array(ids.length);
   let next = 0;
   // Limit concurrent Shopify requests while avoiding one round trip per product.
   await Promise.all(Array.from({ length: Math.min(2, ids.length) }, async () => {
     while (next < ids.length) {
       const index = next++;
       const product = await getPackProduct(admin, ids[index], orders);
-      result[index] = { ...product, selected: settings.find(s => s.productId === ids[index])?.composition || "" };
+      const setting = settings.find(s => s.productId === ids[index]);
+      result[index] = { ...product, selected: setting?.composition || "", ordered: setting?.ordered || false };
     }
   }));
   return result;

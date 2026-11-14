@@ -26,6 +26,13 @@ try {
         await tx.productPack.create({data:{shop,productId,composition:'S/M/L/XL'}});
         await tx.productPack.update({where:{shop_productId:{shop,productId}},data:{composition:'S/M/M/L/L/XL'}});
         assert.equal((await tx.productPack.findUnique({where:{shop_productId:{shop,productId}}}))?.composition,'S/M/M/L/L/XL');
+        await tx.productPack.update({where:{shop_productId:{shop,productId}},data:{ordered:true}});
+        const orderedRow = await tx.productPack.findUnique({where:{shop_productId:{shop,productId}}});
+        assert.equal(orderedRow?.ordered,true);
+        assert.equal(orderedRow?.composition,'S/M/M/L/L/XL');
+        assert.equal(await tx.productPack.count({where:{shop,productId,ordered:false}}),0);
+        await tx.productPack.update({where:{shop_productId:{shop,productId}},data:{ordered:false}});
+        assert.equal(await tx.productPack.count({where:{shop,productId,ordered:false}}),1);
         assert.equal(await tx.productPack.findUnique({where:{shop_productId:{shop:'verification-other-shop',productId}}}),null);
         throw rollback;
       });

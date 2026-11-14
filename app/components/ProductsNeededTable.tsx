@@ -11,6 +11,8 @@ import {
   ButtonGroup,
   Button,
   Tooltip,
+  Checkbox,
+  Banner,
 } from "@shopify/polaris";
 import { useState, useMemo } from "react";
 import { useFetcher } from "@remix-run/react";
@@ -28,7 +30,7 @@ export function ProductsNeededTable({
   const [searchValue, setSearchValue] = useState("");
   const [viewMode, setViewMode] = useState<"variants" | "grouped">("variants");
   const [sortValue, setSortValue] = useState("qty_desc");
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<{ error?: string }>();
 
   // 1. Applica filtro di ricerca
   const searchFilteredProducts = useMemo(() => {
@@ -147,6 +149,8 @@ export function ProductsNeededTable({
         )}
       </IndexTable.Cell>
       <IndexTable.Cell>
+        <Checkbox label="Ordinato" checked={false} disabled={fetcher.state !== "idle"}
+          onChange={() => fetcher.submit({ intent: "setPackOrdered", productId: product.productId, ordered: "true" }, { method: "post" })} />
         {viewMode === "variants" && (
           <Tooltip content="Sposta in Prodotti Terminati per contattare i clienti">
             <Button
@@ -177,10 +181,10 @@ export function ProductsNeededTable({
   if (products.length === 0) {
     return (
       <EmptyState
-        heading="Nessun ordine da evadere 🎉"
+        heading="Nessun prodotto in questa lista"
         image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
       >
-        <p>Tutti gli ordini sono stati evasi. Ottimo lavoro!</p>
+        <p>I prodotti già ordinati sono consultabili in Composizioni e pacchi interi → Ordinati.</p>
       </EmptyState>
     );
   }
@@ -194,6 +198,7 @@ export function ProductsNeededTable({
 
   return (
     <BlockStack gap="400">
+      {fetcher.data?.error && <Banner tone="critical">{fetcher.data.error}</Banner>}
       <InlineStack align="space-between" blockAlign="center">
         <Text variant="headingSm" as="h3">
           Lista prodotti da preparare

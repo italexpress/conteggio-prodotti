@@ -16,6 +16,7 @@ if (process.env.DATABASE_URL) {
     )`;
     await db.$executeRaw`CREATE UNIQUE INDEX IF NOT EXISTS "ProductPack_shop_productId_key"
       ON "ProductPack"("shop", "productId")`;
+    await db.$executeRaw`ALTER TABLE "ProductPack" ADD COLUMN IF NOT EXISTS "ordered" BOOLEAN NOT NULL DEFAULT false`;
     await db.productPack.findFirst();
     console.log('ProductPack: struttura e lettura database verificate');
   } finally {
