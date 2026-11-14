@@ -190,13 +190,13 @@ export default function AdvancedAnalysisDashboard() {
                   <Layout.Section variant="oneThird">
                     <BlockStack gap="200">
                       <Text as="span" tone="subdued">Revenue Totale Incassata</Text>
-                      <Text as="p" variant="headingLg" tone="info">{fmt(data.cashFlow.revenueCollected)}</Text>
+                      <Text as="p" variant="headingLg" tone="success">{fmt(data.cashFlow.revenueCollected)}</Text>
                     </BlockStack>
                   </Layout.Section>
                   <Layout.Section variant="oneThird">
                     <BlockStack gap="200">
                       <Text as="span" tone="subdued">Incassi COD In Sospeso (Pending)</Text>
-                      <Text as="p" variant="headingLg" tone="warning">{fmt(data.cashFlow.pendingCodRevenue)}</Text>
+                      <Text as="p" variant="headingLg" tone="caution">{fmt(data.cashFlow.pendingCodRevenue)}</Text>
                     </BlockStack>
                   </Layout.Section>
                   <Layout.Section variant="oneThird">

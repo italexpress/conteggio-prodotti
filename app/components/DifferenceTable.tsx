@@ -117,7 +117,7 @@ export function DifferenceTable({
           </Text>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <Box minInlineSize="120px">
+          <Box minWidth="120px">
             <BlockStack gap="100">
               <ProgressBar
                 progress={row.coveragePercent}
@@ -133,12 +133,12 @@ export function DifferenceTable({
         <IndexTable.Cell>
           <InlineStack gap="200" blockAlign="center">
             {row.missing > 0 ? (
-              <Badge tone="critical">−{row.missing} mancanti</Badge>
+              <Badge tone="critical">{"−" + String(row.missing) + " mancanti"}</Badge>
             ) : (
-              <Badge tone="success">✓ Coperto</Badge>
+              <Badge tone="success">{"✓ Coperto"}</Badge>
             )}
             {row.surplus > 0 && (
-              <Badge tone="success">+{row.surplus} extra</Badge>
+              <Badge tone="success">{"+" + String(row.surplus) + " extra"}</Badge>
             )}
           </InlineStack>
         </IndexTable.Cell>
@@ -154,10 +154,10 @@ export function DifferenceTable({
         </Text>
         <InlineStack gap="200">
           {criticalCount > 0 && (
-            <Badge tone="critical">{criticalCount} da ordinare</Badge>
+            <Badge tone="critical">{String(criticalCount) + " da ordinare"}</Badge>
           )}
           {coveredCount > 0 && (
-            <Badge tone="success">{coveredCount} coperti</Badge>
+            <Badge tone="success">{String(coveredCount) + " coperti"}</Badge>
           )}
         </InlineStack>
       </InlineStack>

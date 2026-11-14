@@ -43,7 +43,7 @@ function typeBadge(type: OrderType) {
     pending: { label: "In Attesa", tone: undefined },
   };
   const m = map[type];
-  return <Badge tone={m.tone}>{m.label}</Badge>;
+  return <Badge tone={m.tone}>{String(m.label)}</Badge>;
 }
 
 function methodLabel(m: string) {

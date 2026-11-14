@@ -54,3 +54,32 @@ test('an exchange service plus removed products is excluded', async () => {
   assert.equal(result.orderCount, 0);
 });
 
+test('pack demand includes only paid orders and explicit accepted COD', async () => {
+  const pending = order('pending',[line('PANTALONE',10)]);
+  pending.node.displayFinancialStatus = 'PENDING';
+  pending.node.paymentGatewayNames = ['Bank Deposit'];
+  const partial = order('partial',[line('PANTALONE',5)]);
+  partial.node.displayFinancialStatus = 'PARTIALLY_PAID';
+  const result = await getAggregatedProducts(admin([[
+    order('paid',[line('PANTALONE',3)]),
+    order('accepted',[line('PANTALONE',2)],true,true),
+    order('unconfirmed',[line('PANTALONE',7)],true), pending, partial,
+  ]]));
+  assert.equal(result.products[0].packQuantity,5);
+  assert.equal(result.unconfirmedCodOrders.length,1);
+});
+
+test('partial fulfillment uses outstanding quantity and cancelled orders are excluded', async () => {
+  const remaining = line('PANTALONE',8);
+  remaining.node.unfulfilledQuantity = 2;
+  const cancelled = order('cancelled',[line('PANTALONE',20)]);
+  cancelled.node.cancelledAt = '2026-11-14T10:00:00Z';
+  const result = await getAggregatedProducts(admin([[order('partial',[remaining]),cancelled]]));
+  assert.equal(result.products[0].packQuantity,2);
+  assert.equal(result.products[0].totalQuantity,2);
+});
+
+test('Shopify errors never return misleading partial order totals', async () => {
+  await assert.rejects(getAggregatedProducts({graphql:async()=>({json:async()=>({errors:[{message:'Denied'}]})})}));
+});
+

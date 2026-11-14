@@ -101,12 +101,12 @@ export default function OrderDrillDown() {
                 <Text variant="headingMd" as="h3">Dettagli Operativi</Text>
                 
                 <BlockStack gap="200">
-                  <Text as="p"><strong>Tipo Ordine:</strong> <Badge>{order.type}</Badge></Text>
-                  <Text as="p"><strong>Stato Finanziario:</strong> <Badge>{order.status}</Badge></Text>
+                  <Text as="p"><strong>Tipo Ordine:</strong> <Badge>{String(order.type)}</Badge></Text>
+                  <Text as="p"><strong>Stato Finanziario:</strong> <Badge>{String(order.status)}</Badge></Text>
                   <Text as="p"><strong>Metodo Pagamento:</strong> {order.paymentMethod}</Text>
                   <Text as="p">
                     <strong>Tags:</strong>{' '}
-                    {order.tags.length > 0 ? order.tags.map(t => <Badge key={t}>{t}</Badge>) : "Nessuno"}
+                    {order.tags.length > 0 ? order.tags.map(t => <Badge key={t}>{String(t)}</Badge>) : "Nessuno"}
                   </Text>
                 </BlockStack>
 

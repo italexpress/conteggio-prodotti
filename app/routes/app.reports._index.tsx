@@ -82,7 +82,7 @@ export default function ProfitDashboard() {
       subtitle={`Ultimo aggiornamento: ${time}`}
       primaryAction={<Button icon={RefreshIcon} loading={isRefreshing} onClick={() => window.location.reload()}>Aggiorna</Button>}
       secondaryActions={[
-        { content: "Analisi Avanzata", url: "/app/reports/advanced", variant: "primary" },
+        { content: "Analisi Avanzata", url: "/app/reports/advanced" },
         { content: "Dettaglio Ordini", icon: OrderIcon, url: "/app/reports/orders" },
         { content: "Impostazioni", icon: SettingsIcon, url: "/app/reports/settings" },
         { content: "Costi Fissi", icon: BankIcon, url: "/app/reports/costs" },
@@ -206,7 +206,7 @@ export default function ProfitDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" tick={{fontSize: 12}} tickFormatter={(v) => v.substring(5)} />
                       <YAxis tick={{fontSize: 12}} tickFormatter={(v) => "€"+v} />
-                      <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, ""]} />
+                      <Tooltip formatter={(value) => [`€${Number(value ?? 0).toFixed(2)}`, ""]} />
                       <Legend />
                       <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#3b82f6" fill="#bfdbfe" />
                       <Area type="monotone" dataKey="netProfit" name="Profitto" stroke="#22c55e" fill="#bbf7d0" />
@@ -227,7 +227,7 @@ export default function ProfitDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" tick={{fontSize: 12}} />
                       <YAxis tick={{fontSize: 12}} tickFormatter={(v) => "€"+v} />
-                      <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, ""]} />
+                      <Tooltip formatter={(value) => [`€${Number(value ?? 0).toFixed(2)}`, ""]} />
                       <Legend />
                       <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="netProfit" name="Profitto" fill="#22c55e" radius={[4, 4, 0, 0]} />
@@ -248,7 +248,7 @@ export default function ProfitDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" tick={{fontSize: 12}} tickFormatter={(v) => v.substring(5)} />
                       <YAxis tick={{fontSize: 12}} tickFormatter={(v) => "€"+v} />
-                      <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, ""]} />
+                      <Tooltip formatter={(value) => [`€${Number(value ?? 0).toFixed(2)}`, ""]} />
                       <Legend />
                       <Area type="monotone" dataKey="logisticsMargin" name="Logistics Margin" stroke="#8b5cf6" fill="#ddd6fe" />
                     </AreaChart>

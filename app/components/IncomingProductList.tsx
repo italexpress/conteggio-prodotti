@@ -41,7 +41,7 @@ export function IncomingProductList({ items }: IncomingProductListProps) {
         <Text variant="headingSm" as="h3">
           📋 Merce registrata
         </Text>
-        <Badge tone="info">{items.length} registrazioni</Badge>
+        <Badge tone="info">{String(items.length) + " registrazioni"}</Badge>
       </InlineStack>
       <ResourceList
         items={items}
@@ -53,6 +53,7 @@ export function IncomingProductList({ items }: IncomingProductListProps) {
           return (
             <ResourceItem
               id={item.id}
+              onClick={() => {}}
               accessibilityLabel={`Merce in arrivo: ${item.displayName}`}
             >
               <InlineStack align="space-between" blockAlign="center">
@@ -61,18 +62,15 @@ export function IncomingProductList({ items }: IncomingProductListProps) {
                     {item.displayName}
                   </Text>
                   <InlineStack gap="200">
-                    <Badge tone="info">{item.quantity} pz</Badge>
+                    <Badge tone="info">{String(item.quantity) + " pz"}</Badge>
                     {item.expectedArrivalDate && (
-                      <Badge>
-                        📅 Arrivo:{" "}
-                        {new Date(
+                      <Badge>{" 📅 Arrivo:" + String(" ") + String(new Date(
                           item.expectedArrivalDate
                         ).toLocaleDateString("it-IT", {
                           day: "2-digit",
                           month: "2-digit",
                           year: "numeric",
-                        })}
-                      </Badge>
+                        }))}</Badge>
                     )}
                   </InlineStack>
                 </BlockStack>

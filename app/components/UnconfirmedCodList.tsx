@@ -63,13 +63,11 @@ function UnconfirmedCodRow({
             <Text variant="bodyMd" fontWeight="bold" as="span">
               {order.name}
             </Text>
-            <Badge tone={urgencyTone}>
-              {daysAgo === 0
+            <Badge tone={urgencyTone}>{String(daysAgo === 0
                 ? "Oggi"
                 : daysAgo === 1
                 ? "Ieri"
-                : `${daysAgo} giorni fa`}
-            </Badge>
+                : `${daysAgo} giorni fa`)}</Badge>
           </InlineStack>
           {isExpanded && (
             <Box paddingBlockStart="200">
@@ -79,7 +77,7 @@ function UnconfirmedCodRow({
                     <Text variant="bodySm" as="span" tone="subdued">
                       • {item.title}
                     </Text>
-                    <Badge size="small">{item.quantity} pz</Badge>
+                    <Badge size="small">{String(item.quantity) + " pz"}</Badge>
                   </InlineStack>
                 ))}
               </BlockStack>
@@ -100,7 +98,7 @@ function UnconfirmedCodRow({
         </BlockStack>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Badge>{order.itemCount} pz</Badge>
+        <Badge>{String(order.itemCount) + " pz"}</Badge>
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Text variant="bodyMd" fontWeight="semibold" as="span">
@@ -119,7 +117,7 @@ function UnconfirmedCodRow({
       </IndexTable.Cell>
       <IndexTable.Cell>
         <InlineStack gap="200" blockAlign="center">
-          <Badge tone="critical">⏳ Da confermare</Badge>
+          <Badge tone="critical">{"⏳ Da confermare"}</Badge>
           <div onClick={(e) => e.stopPropagation()}>
             <fetcher.Form method="post">
               <input type="hidden" name="intent" value="acceptCod" />
@@ -175,9 +173,9 @@ export function UnconfirmedCodList({ orders }: UnconfirmedCodListProps) {
           Ordini in contrassegno senza conferma
         </Text>
         <InlineStack gap="200">
-          <Badge tone="critical">{orders.length} ordini</Badge>
-          <Badge tone="warning">{totalItems} pezzi</Badge>
-          <Badge>€{totalValue.toFixed(2)} totale</Badge>
+          <Badge tone="critical">{String(orders.length) + " ordini"}</Badge>
+          <Badge tone="warning">{String(totalItems) + " pezzi"}</Badge>
+          <Badge>{"€" + String(totalValue.toFixed(2)) + " totale"}</Badge>
         </InlineStack>
       </InlineStack>
 

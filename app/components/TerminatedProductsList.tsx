@@ -72,12 +72,11 @@ export function TerminatedProductsList({
                 {product.displayName}
               </Text>
               <InlineStack gap="200" blockAlign="center">
-                <Badge tone="critical">{affectedOrders.length} ordini bloccati</Badge>
-                <Badge tone="warning">{totalNeeded} pezzi richiesti</Badge>
+                <Badge tone="critical">{String(affectedOrders.length) + " ordini bloccati"}</Badge>
+                <Badge tone="warning">{String(totalNeeded) + " pezzi richiesti"}</Badge>
                 <Button
                   size="micro"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={() => {
                     fetcher.submit(
                       { intent: "removeOutOfStock", id: product.id, variantId: product.variantId },
                       { method: "post" }
@@ -109,10 +108,8 @@ export function TerminatedProductsList({
                               <Text variant="bodySm" as="span" tone="subdued">{order.customerName}</Text>
                             </InlineStack>
                             <InlineStack gap="200" blockAlign="center">
-                              <Badge>{order.quantity} pz</Badge>
-                              <Badge tone={urgencyTone}>
-                                {daysAgo === 0 ? "Oggi" : `${daysAgo} gg fa`}
-                              </Badge>
+                              <Badge>{String(order.quantity) + " pz"}</Badge>
+                              <Badge tone={urgencyTone}>{String(daysAgo === 0 ? "Oggi" : `${daysAgo} gg fa`)}</Badge>
                               <Button
                                 size="micro"
                                 url={`shopify:admin/orders/${order.id.split("/").pop()}`}
@@ -145,7 +142,7 @@ export function TerminatedProductsList({
         <Text variant="headingSm" as="h3">
           Prodotti Fuori Stock
         </Text>
-        <Badge tone="critical">{terminatedProducts.length} prodotti terminati</Badge>
+        <Badge tone="critical">{String(terminatedProducts.length) + " prodotti terminati"}</Badge>
       </InlineStack>
 
       <Banner tone="critical">

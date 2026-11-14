@@ -10,6 +10,7 @@ export interface AggregatedProduct {
   totalQuantity: number;
   codQuantity: number;
   codAcceptedQuantity: number; // Contrassegni con tag "ACCETTATO"
+  packQuantity?: number; // Solo PAID oppure COD ACCETTATO, quantità ancora da evadere
 }
 
 // Tipo per un ordine COD non confermato
@@ -96,6 +97,7 @@ const UNFULFILLED_ORDERS_QUERY = `
           createdAt
           paymentGatewayNames
           displayFinancialStatus
+          cancelledAt
           displayFulfillmentStatus
           totalPriceSet {
             shopMoney {
@@ -104,11 +106,13 @@ const UNFULFILLED_ORDERS_QUERY = `
             }
           }
           lineItems(first: 250) {
+            pageInfo { hasNextPage }
             edges {
               node {
                 title
                 variantTitle
                 currentQuantity
+                unfulfilledQuantity
                 product {
                   id
                 }
@@ -184,18 +188,20 @@ export async function getAggregatedProducts(
       if (json.errors) {
         console.error("GraphQL Errors:", JSON.stringify(json.errors, null, 2));
         // Se c'è un errore, smettiamo di ciclare ma non crashiamo
-        break;
+        throw new Error("Impossibile caricare tutti gli ordini Shopify");
       }
 
       if (!json.data || !json.data.orders) {
         console.error("GraphQL Response missing data.orders:", json);
-        break;
+        throw new Error("Risposta ordini Shopify incompleta");
       }
 
       const { orders } = json.data;
 
     for (const edge of orders.edges) {
       const order = edge.node;
+      if (order.cancelledAt) continue;
+      if (order.lineItems.pageInfo?.hasNextPage) throw new Error("Ordine con oltre 250 righe: conteggio incompleto");
 
       // Filtra solo ordini con stato finanziario accettato
       if (!acceptedFinancialStatuses.has(order.displayFinancialStatus)) {
@@ -205,9 +211,9 @@ export async function getAggregatedProducts(
       // Le spedizioni exchange sono servizi, non prodotti da preparare.
       // Gli ordini misti mantengono soltanto le altre righe nel conteggio.
       const productLineItems = order.lineItems.edges.filter((e: any) =>
-        e.node.currentQuantity > 0 &&
+        (e.node.unfulfilledQuantity ?? e.node.currentQuantity) > 0 &&
         e.node.title.trim().replace(/\s+/g, " ").toUpperCase() !== "SPEDIZIONE EXCHANGE"
-      );
+      ).map((e: any) => ({ node: { ...e.node, currentQuantity: e.node.unfulfilledQuantity ?? e.node.currentQuantity } }));
       if (productLineItems.length === 0) continue;
 
       const gateways = order.paymentGatewayNames || [];
@@ -222,6 +228,7 @@ export async function getAggregatedProducts(
       const hasAcceptedTag = orderTags.some((tag: string) => tag.toUpperCase() === "ACCETTATO");
       
       const isCodAccepted = isCOD && hasAcceptedTag;
+      const includeInPacks = order.displayFinancialStatus === "PAID" || (isCodAccepted && gateways.length > 0);
 
       if (isCodAccepted) {
         codAcceptedCount++;
@@ -289,6 +296,7 @@ export async function getAggregatedProducts(
         const existing = productMap.get(variantId);
         if (existing) {
           existing.totalQuantity += item.currentQuantity;
+          existing.packQuantity = (existing.packQuantity || 0) + (includeInPacks ? item.currentQuantity : 0);
           if (isCOD) {
             existing.codQuantity += item.currentQuantity;
           }
@@ -303,6 +311,7 @@ export async function getAggregatedProducts(
             variantTitle: item.variantTitle || "",
             displayName,
             totalQuantity: item.currentQuantity,
+            packQuantity: includeInPacks ? item.currentQuantity : 0,
             codQuantity: isCOD ? item.currentQuantity : 0,
             codAcceptedQuantity: isCodAccepted ? item.currentQuantity : 0,
           });
@@ -312,9 +321,10 @@ export async function getAggregatedProducts(
 
     hasNextPage = orders.pageInfo.hasNextPage;
     cursor = orders.pageInfo.endCursor;
+    if (hasNextPage && !cursor) throw new Error("Paginazione ordini incompleta");
     } catch (error) {
       console.error("Caught error in GraphQL fetch:", error);
-      break;
+      throw error;
     }
   }
 

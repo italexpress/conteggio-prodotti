@@ -29,6 +29,9 @@ import {
 import { useState, useMemo } from "react";
 
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
+import { getPackPlan, getPackProduct } from "../services/packs.server";
+import { PackPlan } from "../components/PackPlan";
 import { getAggregatedProducts } from "../services/orders.server";
 import {
   getIncomingProducts,
@@ -69,6 +72,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   return json({
+    packPlan: await getPackPlan(admin, shop, orderData.products),
     products: orderData.products,
     orderCount: orderData.orderCount,
     codAcceptedCount: orderData.codAcceptedCount,
@@ -90,6 +94,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = formData.get("intent") as string;
 
   switch (intent) {
+    case "savePack": {
+      const productId = String(formData.get("productId") || "");
+      const composition = String(formData.get("composition") || "");
+      if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId)) return json({ error: "Prodotto non valido" }, { status: 400 });
+      const { admin } = await authenticate.admin(request);
+      const product = await getPackProduct(admin, productId);
+      if (!product.options.includes(composition)) return json({ error: "Composizione incompatibile con le taglie Shopify" }, { status: 400 });
+      await prisma.productPack.upsert({ where: { shop_productId: { shop, productId } }, create: { shop, productId, composition }, update: { composition } });
+      return json({ success: true });
+    }
     case "addIncoming": {
       const productId = formData.get("productId") as string;
       const variantId = formData.get("variantId") as string;
@@ -388,7 +402,7 @@ function StatCard({
 
 // --- PAGINA PRINCIPALE ---
 export default function OrderManagerIndex() {
-  const { products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
+  const { packPlan, products, orderCount, codAcceptedCount, unconfirmedCodOrders, affectedOrdersMap, incomingItems, incomingMap, outOfStockProducts, lastUpdated } =
     useLoaderData<typeof loader>();
 
   const navigation = useNavigation();
@@ -470,9 +484,10 @@ export default function OrderManagerIndex() {
       }
     >
       <BlockStack gap="600">
+        <PackPlan products={packPlan} />
         {/* DASHBOARD STATISTICHE */}
         <Layout>
-          <Layout.Section variant="oneQuarter">
+          <Layout.Section variant="oneHalf">
             <StatCard
               title="Ordini aperti"
               value={orderCount}
@@ -481,7 +496,7 @@ export default function OrderManagerIndex() {
               subtitle="Da evadere"
             />
           </Layout.Section>
-          <Layout.Section variant="oneQuarter">
+          <Layout.Section variant="oneHalf">
             <StatCard
               title="Pezzi totali"
               value={totalItems}
@@ -490,7 +505,7 @@ export default function OrderManagerIndex() {
               subtitle={`${products.length} prodotti diversi`}
             />
           </Layout.Section>
-          <Layout.Section variant="oneQuarter">
+          <Layout.Section variant="oneHalf">
             <StatCard
               title="In contrassegno"
               value={totalCod}
@@ -499,7 +514,7 @@ export default function OrderManagerIndex() {
               subtitle={`${totalCodAccepted} pz accettati su ${totalCod}`}
             />
           </Layout.Section>
-          <Layout.Section variant="oneQuarter">
+          <Layout.Section variant="oneHalf">
             <StatCard
               title="COD Accettati ✅"
               value={totalCodAccepted}
@@ -526,9 +541,7 @@ export default function OrderManagerIndex() {
                       ? "warning"
                       : "critical"
                   }
-                >
-                  {coveredProducts}/{productsWithNeeds} prodotti coperti ({coveragePercent}%)
-                </Badge>
+                >{String(coveredProducts) + "/" + String(productsWithNeeds) + " prodotti coperti (" + String(coveragePercent) + "%) "}</Badge>
               </InlineStack>
               <ProgressBar
                 progress={coveragePercent}

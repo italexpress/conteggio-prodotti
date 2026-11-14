@@ -124,15 +124,11 @@ export function ProductsNeededTable({
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Badge tone="attention" size="medium">
-          {String(product.totalQuantity)}
-        </Badge>
+        <Badge tone="attention" size="medium">{String(String(product.totalQuantity))}</Badge>
       </IndexTable.Cell>
       <IndexTable.Cell>
         {product.codQuantity > 0 ? (
-          <Badge tone="warning" size="medium">
-            {String(product.codQuantity)}
-          </Badge>
+          <Badge tone="warning" size="medium">{String(String(product.codQuantity))}</Badge>
         ) : (
           <Text variant="bodyMd" as="span" tone="subdued">
             —
@@ -141,13 +137,9 @@ export function ProductsNeededTable({
       </IndexTable.Cell>
       <IndexTable.Cell>
         {product.codAcceptedQuantity > 0 ? (
-          <Badge tone="success" size="medium">
-            ✅ {String(product.codAcceptedQuantity)}
-          </Badge>
+          <Badge tone="success" size="medium">{" ✅ " + String(String(product.codAcceptedQuantity))}</Badge>
         ) : product.codQuantity > 0 ? (
-          <Badge tone="critical" size="medium">
-            ✗ 0
-          </Badge>
+          <Badge tone="critical" size="medium">{" ✗ 0 "}</Badge>
         ) : (
           <Text variant="bodyMd" as="span" tone="subdued">
             —
@@ -207,16 +199,16 @@ export function ProductsNeededTable({
           Lista prodotti da preparare
         </Text>
         <InlineStack gap="200">
-          <Badge>{sortedProducts.length} righe</Badge>
-          <Badge tone="attention">{totalItems} pz totali</Badge>
+          <Badge>{String(sortedProducts.length) + " righe"}</Badge>
+          <Badge tone="attention">{String(totalItems) + " pz totali"}</Badge>
           {totalCod > 0 && (
-            <Badge tone="warning">{totalCod} in contrassegno</Badge>
+            <Badge tone="warning">{String(totalCod) + " in contrassegno"}</Badge>
           )}
         </InlineStack>
       </InlineStack>
 
       <InlineStack align="space-between" blockAlign="center">
-        <ButtonGroup segmented>
+        <ButtonGroup variant="segmented">
           <Button
             pressed={viewMode === "variants"}
             onClick={() => setViewMode("variants")}
